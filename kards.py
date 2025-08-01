@@ -69,7 +69,7 @@ pass_button_region = (pyautogui.size()[0]*1607//1920,pyautogui.size()[1]*622//10
 second_row = (pyautogui.size()[0]*313//1920, pyautogui.size()[1]*643//1080, 1259 , 263) #支援战线区域
 third_row = (pyautogui.size()[0]*333//1920, pyautogui.size()[1]*397//1080, 1417,261) #前线区域
 enemy_guard_zone = (pyautogui.size()[0]*431//1920, pyautogui.size()[1]*129//1080, 1075, 161) #敌方支援区域状态区域
-enemy_second_row = (pyautogui.size()[0]*400//1920, pyautogui.size()[1]*100//1080, 1143, 289) #地方支援区域
+enemy_second_row = (pyautogui.size()[0]*400//1920, pyautogui.size()[1]*100//1080, 1143, 289) #敌方支援区域
 ocr_stamina_region = (32, 849, 53, 76) #体力数值区域
 front_line_upper_region = (420, 370, 1000, 37) #上面前线条表达区域
 front_line_lower_region = (420, 635, 1000, 37) #下面前线条表达区域
@@ -108,7 +108,7 @@ class Box:
 ocrscanner = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
 failsafe_counter = 0
 ocr_stamina = 0
-front_line_status = 0  #0代表未知 1代表被我占领 2代表地方占领 3代表中立
+front_line_status = 0  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
 
 def gameround_timeout_bug_reset(): #有时候20s倒计时失效，此时单手超过4分钟以后选择自爆
     if check_image(gear_img, 0.8, ninegong_zone3) != None :
@@ -350,7 +350,7 @@ def play_round1(): #用于抽牌
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
         pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
         pyautogui.click()
-        time.sleep(0.9)  # 等待过完动画
+        time.sleep(0.3)  # 等待过完动画
         #------------- OCR ---------------
         ocrimage = pyautogui.screenshot('ocr.png', region=( x-470, pyautogui.size()[1] - 650  , 730, 550))
         ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
@@ -368,34 +368,45 @@ def play_round1(): #用于抽牌
             if '西苏精神' in ocrresult: #转移伤害给敌方总部
                 print(formatted_time + "西苏精神, 转移伤害给敌方总部")
                 pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.8)  # 按照一定的顺序把牌丢出去
+                pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.5)  # 按照一定的顺序把牌丢出去
 
-        if any(key in ocrresult for key in movable_unit):   #移动兵力
+        elif any(key in ocrresult for key in movable_unit):   #移动兵力
             print(formatted_time + "移动兵力")
-            pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-            pyautogui.dragTo((pyautogui.size()[0]//2, pyautogui.size()[1]*2//3), duration=0.6)
+            if 'AGM2' in ocrresult:
+                drop_card_to_anyzone(on_region=second_row)
+                move_click_to_anyzone(on_region=enemy_second_row)
+            else:
+                pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
+                pyautogui.dragTo((pyautogui.size()[0]//2, pyautogui.size()[1]*2//3), duration=0.6)
 
-        if any(key in ocrresult for key in negtive_buff):   #把负面buff扔给敌人
+        elif any(key in ocrresult for key in negtive_buff):   #把负面buff扔给敌人
             print(formatted_time + "负面buff")
             drop_card_to_anyzone()
 
-        if any(key in ocrresult for key in postive_buff):   #正面buff扔给自己
+        elif any(key in ocrresult for key in postive_buff):   #正面buff扔给自己
             print(formatted_time + "正面buff")
             drop_card_to_anyzone(on_guard=False, on_region=second_row)
+            break
 
-        if any(key in ocrresult for key in neutral_buff):   #中性buff挠头处理
+        elif any(key in ocrresult for key in neutral_buff):   #中性buff挠头处理
             if '3张' in ocrresult:   #三选一问题,选中间
                 pyautogui.click(pyautogui.size()[0]//2, y=pyautogui.size()[1]//2)
                 pyautogui.click(pyautogui.size()[0]//2, y=pyautogui.size()[1]//2)
                 print(formatted_time + "3张, 三选一问题,选中间")
+                break
             elif '武士之刃' in ocrresult:  # 直接消灭对方一个单位
                 drop_card_to_anyzone(on_region=enemy_second_row)
                 print(formatted_time + "武士之刃, 直接消灭对方一个单位")
+                break
             elif '两栖迸攻' in ocrresult:  # 直接消灭对方一个攻击小于3单位
                 drop_card_to_anyzone(on_tank=False, on_guard=False, on_region=enemy_second_row)
                 print(formatted_time + "两栖迸攻, 直接消灭对方一个攻击小于3单位")
+                break
+        else:
+            drop_card_to_anyzone(on_head = False, on_region=enemy_second_row)
 
-        mouse_return_home()
+        mouse_shake()
+    mouse_return_home()
 
 def drop_card_to_anyzone(on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = False, on_region=enemy_second_row):
     global enemy_headquarters_pos
@@ -422,6 +433,40 @@ def drop_card_to_anyzone(on_guard=True, on_infantry=True, on_tank=True, on_morta
         pyautogui.dragTo(bomber_pos, duration=0.8)
     elif enemy_headquarters_pos != None and on_head:
         pyautogui.dragTo(enemy_headquarters_pos, duration=0.9)
+    return
+
+def move_click_to_anyzone(on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = False, on_region=enemy_second_row):
+    global enemy_headquarters_pos
+    pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
+
+    guard_pos = check_image(guard_image, 0.8, on_region)
+    infantry_pos = check_image(infantry_image, 0.8, on_region)
+    tank_pos = check_image(tank_image, 0.8, on_region)
+    mortar_pos = check_image(mortar_image, 0.8, on_region)
+    fighter_pos = check_image(fighter_image, 0.8, on_region)
+    bomber_pos = check_image(bomber_image, 0.8, on_region)
+
+    if guard_pos != None and on_guard:
+        pyautogui.moveTo(guard_pos, duration=0.9)
+        pyautogui.click()
+    elif infantry_pos != None and on_infantry:
+        pyautogui.moveTo(infantry_pos, duration=0.6)
+        pyautogui.click()
+    elif tank_pos != None and on_tank:
+        pyautogui.moveTo(tank_pos, duration=0.6)
+        pyautogui.click()
+    elif mortar_pos != None and on_mortar:
+        pyautogui.moveTo(mortar_pos, duration=0.7)
+        pyautogui.click()
+    elif fighter_pos != None and on_fighter:
+        pyautogui.moveTo(fighter_pos, duration=0.8)
+        pyautogui.click()
+    elif bomber_pos != None and on_bomber:
+        pyautogui.moveTo(bomber_pos, duration=0.8)
+        pyautogui.click()
+    elif enemy_headquarters_pos != None and on_head:
+        pyautogui.moveTo(enemy_headquarters_pos, duration=0.9)
+        pyautogui.click()
     return
 
 def play_round2(): #用于移动支援线
@@ -464,41 +509,42 @@ def play_round3(): #用于前线
     global game_round    
     global enemy_headquarters_pos
 
-    time.sleep(1)  # 等待过完动画
-    guard_pos = check_image(guard_image, 0.84, enemy_second_row)
-    if enemy_headquarters_pos != None or guard_pos != None: #阶段3，引导坦克步兵攻击守护单位和总部
-        print(formatted_time +"第3轮出牌，前线动作")
-        try:
-            posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.9, region=third_row)
-            posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
-            for posInfantry in posInfantryBoxFilterd:
-                if check_abnormal():
-                    print(formatted_time + "阶段3a体力0或者发现异常， 退出")
-                    return
-                pyautogui.click(posInfantry[0] + posInfantry[2]//2 + random.choice([-1, 1])*51, posInfantry[1]-50)
-                if guard_pos != None:
-                    pyautogui.dragTo((guard_pos[0] - 60, guard_pos[1] + 80), duration=random.uniform(0.4, 1))
-                elif enemy_headquarters_pos != None:
-                    pyautogui.dragTo(enemy_headquarters_pos, duration=random.uniform(0.4, 1))
-                mouse_return_home()
-        except Exception as e:
-            print(formatted_time +"阶段3查找Infantry异常，可能目标已移动")
+    if front_line_status != 2:  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
+        time.sleep(1)  # 等待过完动画
+        guard_pos = check_image(guard_image, 0.84, enemy_second_row)
+        if enemy_headquarters_pos != None or guard_pos != None: #阶段3，引导坦克步兵攻击守护单位和总部
+            print(formatted_time +"第3轮出牌，前线动作")
+            try:
+                posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.9, region=third_row)
+                posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
+                for posInfantry in posInfantryBoxFilterd:
+                    if check_abnormal():
+                        print(formatted_time + "阶段3a体力0或者发现异常， 退出")
+                        return
+                    pyautogui.click(posInfantry[0] + posInfantry[2]//2 + random.choice([-1, 1])*51, posInfantry[1]-50)
+                    if guard_pos != None:
+                        pyautogui.dragTo((guard_pos[0] - 60, guard_pos[1] + 80), duration=random.uniform(0.4, 1))
+                    elif enemy_headquarters_pos != None:
+                        pyautogui.dragTo(enemy_headquarters_pos, duration=random.uniform(0.4, 1))
+                    mouse_return_home()
+            except Exception as e:
+                print(formatted_time +"阶段3查找Infantry异常，可能目标已移动")
 
-        try:
-            posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.9, region=third_row)
-            posTankBoxFilterd = filter_boxes(posTankBox, 10)
-            for posTank in posTankBoxFilterd:
-                if check_abnormal():
-                    print(formatted_time + "阶段3b体力0或者发现异常，退出")
-                    return
-                pyautogui.click(posTank[0] + posTank[2]//2 + random.choice([-1, 1])*51, posTank[1]-50)
-                if guard_pos != None:
-                    pyautogui.dragTo((guard_pos[0] - 60, guard_pos[1] + 80), duration=random.uniform(0.4, 1))
-                elif enemy_headquarters_pos != None:
-                    pyautogui.dragTo(enemy_headquarters_pos, duration=random.uniform(0.4, 1))
-                mouse_return_home()
-        except Exception as e:
-            print(formatted_time +"阶段3查找Tank异常，可能目标已移动")
+            try:
+                posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.9, region=third_row)
+                posTankBoxFilterd = filter_boxes(posTankBox, 10)
+                for posTank in posTankBoxFilterd:
+                    if check_abnormal():
+                        print(formatted_time + "阶段3b体力0或者发现异常，退出")
+                        return
+                    pyautogui.click(posTank[0] + posTank[2]//2 + random.choice([-1, 1])*51, posTank[1]-50)
+                    if guard_pos != None:
+                        pyautogui.dragTo((guard_pos[0] - 60, guard_pos[1] + 80), duration=random.uniform(0.4, 1))
+                    elif enemy_headquarters_pos != None:
+                        pyautogui.dragTo(enemy_headquarters_pos, duration=random.uniform(0.4, 1))
+                    mouse_return_home()
+            except Exception as e:
+                print(formatted_time +"阶段3查找Tank异常，可能目标已移动")
 
 def check_abnormal():
     global ocr_stamina
@@ -561,6 +607,8 @@ def check_image(image_name, confidence_level, detect_region=all_screen, grayscal
 def mouse_return_home():
     pyautogui.moveTo(1563 + random.uniform(-50, 50), 840 + random.uniform(-50, 50), duration=random.uniform(0.7, 1.0))  # 移动鼠标不遮挡屏幕
 
+def mouse_shake():
+    pyautogui.move(random.uniform(-50, 50), random.uniform(-90, -50), duration=random.uniform(0.1, 0.3))  # 移动
 
 def filter_boxes(raw_data, threshold):
     filtered_boxes = []
@@ -603,9 +651,9 @@ def check_frontline_status():
     gray_img = cv2.cvtColor(cv2image, cv2.COLOR_BGR2GRAY)
     gray_mean_lower = np.mean(gray_img)  # 范围0-255，值越小越黑，越大越白
 
-    if gray_mean_upper > gray_mean_lower and gray_mean_upper - gray_mean_lower > 1:  #3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+    if gray_mean_upper > gray_mean_lower and gray_mean_upper - gray_mean_lower > 5:  #3代表中立 1代表被我占领 2代表敌方占领 0代表未知
         frontline_status = 2
-    elif gray_mean_upper < gray_mean_lower and gray_mean_lower - gray_mean_upper > 1:
+    elif gray_mean_upper < gray_mean_lower and gray_mean_lower - gray_mean_upper > 5:
         frontline_status = 1
     else:
         frontline_status = 3
@@ -656,7 +704,7 @@ def main():
 def ocr_check_stamina(): #Check Stamina by using OCR
     global ocr_stamina
     ocrimage = pyautogui.screenshot('ocr_stamina.png', region=ocr_stamina_region)
-    ocrresult = ocrscanner.readtext('ocr_stamina.png', lang_list=['ru','en'], mag_ratio=0.5, detail=0, allowlist ='0123456789')
+    ocrresult = ocrscanner.readtext('ocr_stamina.png', ['ru','en'], mag_ratio=0.5, detail=0, allowlist ='0123456789')
     if ocrresult:
         print(formatted_time + 'OCR stamina: ' + ocrresult[0])
         ocr_stamina = ocrresult[0]
@@ -678,7 +726,8 @@ def debug_testing():
         check_frontline_status()
         #i = pyautogui.pixelMatchesColor(front_line_upper_region[0] , front_line_upper_region[1] , (36, 22, 15), tolerance=20)  # 检测前线线条黑色占比
         #print(i)
-
+        ocrresult = ocrscanner.readtext('ocr_stamina.png', ['ru', 'en'], mag_ratio=0.5, detail=0, allowlist='0123456789')
+        print(ocrresult)
         if False:
             try:
                 guard_pos = pyautogui.locateAllOnScreen(frontline_images[1], confidence=0.8, region=all_screen, grayscale=True)
