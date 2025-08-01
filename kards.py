@@ -33,6 +33,8 @@ start_scale125_img = "start_scale125.png" #您处于不活跃被踢125%
 start_scale100_img = "start_scale100.png" #您处于不活跃被踢100%
 gear_img = "gearicon.png" #右上角的齿轮图标
 self_destruct_img = "selfdestruct.png" #自毁选项
+close_Ad_button_image = "closeAd.png" #结算广告
+daily_mission_button_image = "daily_mission.png"
 frontline_images = ["frontline1.png", "frontline2.png"]
 
 #屏幕范围定义，注： 每张卡160x220 范围坐标为左上角x y 然后是宽度 高度
@@ -159,10 +161,21 @@ def click_start_game_button():
         error_handling(confirm_button_image, "点击了选牌以后的确认键", 0.7, True, lower_half_screen)
         mouse_return_home()
         round_total_start_time = time.time()
+
     error_handling(continue_button_image, "点击了继续按钮, 结束战斗（一般是输了）", 0.7, True)
+
     error_handling(get_gold, "找到今日金币字样，点击")
+
     error_handling(restart_img, "找到重新连接字样，点击")
+
     error_handling(disconnect_img, "找到退出(2)字样，点击")
+
+    error_handling(close_Ad_button_image, "找到了广告，点击叉子")
+
+    if check_image(daily_mission_button_image, 0.7, lower_half_screen) != None:
+        pyautogui.moveTo((pyautogui.size()[0]*99//100, pyautogui.size()[1]*99//100), duration=random.uniform(0.6, 1.2))
+        pyautogui.click((pyautogui.size()[0]*99//100, pyautogui.size()[1]*99//100))
+        print(formatted_time + "触发了今日任务，点击屏幕右下角忽略")
 
     if check_image(reconnect_img, 0.9) != None :
         print(formatted_time+"然然触发了重新登陆，退出")
