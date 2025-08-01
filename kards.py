@@ -1,6 +1,6 @@
 import pyautogui, time, datetime, pygetwindow as gw, random, keyboard, sys, easyocr
 from datetime import datetime
-
+import cv2
 # 安装命令：
 # pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow keyboard easyocr
 confirm_button_image = "confirm.png" #选派确认按钮
@@ -324,13 +324,15 @@ def play_cards():
 def play_round1(): #用于抽牌
     global enemy_headquarters_pos
     print(formatted_time +"第1轮出牌，抽最下面的牌") #阶段1，抽牌
-    time.sleep(1)  # 等待过完动画
-    mouse_coeff = 70
+    time.sleep(1)  # 等待过完抽卡动画
+    mouse_yaxis_coeff = 60
+
     for i in range(7):
         if check_abnormal(): return
-        x = 720 + i*110
+        x = 640 + i*107
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
-        pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_coeff)
+        pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
+        pyautogui.click()
         time.sleep(0.9)  # 等待过完动画
         #------------- OCR ---------------
         ocrimage = pyautogui.screenshot('ocr.png', region=( x-470, pyautogui.size()[1] - 650  , 730, 550))
@@ -348,12 +350,12 @@ def play_round1(): #用于抽牌
             print(formatted_time + "特殊指令处理")
             if '西苏精神' in ocrresult: #转移伤害给敌方总部
                 print(formatted_time + "西苏精神, 转移伤害给敌方总部")
-                pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+                pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                 pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.8)  # 按照一定的顺序把牌丢出去
 
         if any(key in ocrresult for key in movable_unit):   #移动兵力
             print(formatted_time + "移动兵力")
-            pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+            pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
             pyautogui.dragTo((pyautogui.size()[0]//2, pyautogui.size()[1]*2//3), duration=0.6)
 
         if any(key in ocrresult for key in negtive_buff):   #把负面buff扔给敌人
@@ -380,7 +382,7 @@ def play_round1(): #用于抽牌
 
 def drop_card_to_anyzone(on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = False, on_region=enemy_second_row):
     global enemy_headquarters_pos
-    pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+    pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
 
     guard_pos = check_image(guard_image, 0.8, on_region)
     infantry_pos = check_image(infantry_image, 0.8, on_region)
@@ -484,15 +486,15 @@ def play_round3(): #用于前线
 def check_abnormal():
     global ocr_stamina
     abnormal_state = False
-    if check_image(mission_failed_image, 0.8, lower_half_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
-    if check_image(mission_passed_image, 0.8, lower_half_screen) != None: print(formatted_time + "检测到本局失败, 记录一下")
+    if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
+    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "检测到本局失败, 记录一下")
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
         print(formatted_time + "异常检测程序发现 对手 字样")
         abnormal_state = True
     if check_image(continue_button_image, 0.8, lower_half_screen) != None: #找到继续字样
         print(formatted_time + "异常检测程序发现 继续 字样")
         abnormal_state = True
-    if False: # -------------- OCR ----------------
+    if True: # -------------- OCR ----------------
         ocr_check_stamina()
         if ocr_stamina == 0:
             print(formatted_time + "OCR发现0体力")
@@ -537,7 +539,7 @@ def check_image(image_name, confidence_level, detect_region=all_screen, grayscal
             return None
 
 def mouse_return_home():
-    pyautogui.moveTo(1563 + random.uniform(-50, 50), 840 + random.uniform(-50, 50), duration=random.uniform(0.2, 0.7))  # 移动鼠标不遮挡屏幕
+    pyautogui.moveTo(1563 + random.uniform(-50, 50), 840 + random.uniform(-50, 50), duration=random.uniform(0.7, 1.0))  # 移动鼠标不遮挡屏幕
 
 
 def filter_boxes(raw_data, threshold):
@@ -580,8 +582,8 @@ def main():
     round_total_start_time = time.time()
     reset_game_stage()
     print(" -- KARDs 1939 Better AFK, Ver 250801d by Eason -- ")
-    logger = TimestampLogger("w")
     debug_testing()
+    logger = TimestampLogger("w")
     while True:
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
@@ -611,7 +613,7 @@ def main():
 def ocr_check_stamina(): #Check Stamina by using OCR
     global ocr_stamina
     ocrimage = pyautogui.screenshot('ocr_stamina.png', region=ocr_stamina_region)
-    ocrresult = ocrscanner.readtext('ocr_stamina.png', detail=0)
+    ocrresult = ocrscanner.readtext('ocr_stamina.png', lang_list=['ru','en'], mag_ratio=0.5, detail=0, allowlist ='0123456789')
     if ocrresult:
         print(formatted_time + 'OCR stamina: ' + ocrresult[0])
         ocr_stamina = ocrresult[0]
@@ -621,15 +623,26 @@ def ocr_check_stamina(): #Check Stamina by using OCR
 def debug_testing():
     global formatted_time
     #if True: #For debug
-    if False:
+    if True:
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
 
-        mouse_x, mouse_y = pyautogui.position()
-        x = 720
-        ocrimage = pyautogui.screenshot('ocr.png', region=(x-630, pyautogui.size()[1]-100 - 892 , 390, 470))
-        ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
-        print(list(ocrresult))
+        #mouse_x, mouse_y = pyautogui.position()
+        #x = 720
+        #ocrimage = pyautogui.screenshot('frontline.png', region=(420, 360 , 1000, 40))
+        #ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
+        #print(list(ocrresult))
+        front_line_upper_region = (420, 360 , 1000, 40)
+        blackcolor_counter = 0
+        #i = pyautogui.pixelMatchesColor(front_line_upper_region[0] , front_line_upper_region[1] , (36, 22, 15), tolerance=20)  # 检测前线线条黑色占比
+        #print(i)
+        for x in range(40):
+            print(x)
+            for y in range(front_line_upper_region[3]):
+                if pyautogui.pixelMatchesColor(front_line_upper_region[0] + x, front_line_upper_region[1] + y, (36, 22, 15), tolerance=30): #检测前线线条黑色占比
+                    blackcolor_counter += 1
+        print(blackcolor_counter)
+
 
         if False:
             try:
@@ -646,6 +659,7 @@ def debug_testing():
                 print("Not found 1")
 
 # ---------------- Debug Section End --------------------
+        print("Ending")
         while True: pass
 
 if __name__ == "__main__":
