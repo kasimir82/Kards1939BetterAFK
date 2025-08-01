@@ -80,8 +80,8 @@ failsafe_counter = 0
 ocr_stamina = 0
 front_line_status = 3  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
 front_line_diff_threshold = 5
-front_line_upper_base = 50
-front_line_lower_base = 50
+front_line_upper_base = 0
+front_line_lower_base = 0
 game_stage = 0
 game_round = 0
 ocr_stamina = 0
@@ -153,10 +153,12 @@ def click_start_game_button():
     global round_total_start_time #本局起始时间
     global failsafe_counter
     global game_window
+    global front_line_upper_base
+    global front_line_lower_base
 
     round_single_time = time.time() - round_start_time
     round_total_time = time.time() - round_total_start_time
-    print(formatted_time+f"开始跑按钮, 点击流程:{game_stage}, 轮次:{game_round}, 本轮耗时{round_single_time:.0f}秒，全局{round_total_time:.0f}秒") #game_stage保证了进入对局的点击顺序
+    print(formatted_time+f"开始跑流程:{game_stage},轮次:{game_round},本轮耗时{round_single_time:.0f}秒，全局{round_total_time:.0f}秒,前线状态:" + frontline_status[front_line_status]) #game_stage保证了进入对局的点击顺序
     
     if round_single_time > 60 * 6:   #游戏倒计时超时以后bug处理
         gameround_timeout_bug_reset()
@@ -202,8 +204,12 @@ def click_start_game_button():
         mouse_return_home()
     if check_image(confirm_button_image, 0.7, lower_half_screen) != None :
         error_handling(confirm_button_image, "点击了选牌以后的确认键", 0.7, True, lower_half_screen)
+        front_line_upper_base = 0
         mouse_return_home()
         round_total_start_time = time.time()
+
+    if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
+    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
 
     error_handling(continue_button_image, "点击了继续按钮, 结束战斗（一般是输了）", 0.7, True)
 
@@ -222,9 +228,6 @@ def click_start_game_button():
         pyautogui.click((pyautogui.size()[0] * 90 // 100, pyautogui.size()[1] * 90 // 100))
         pyautogui.click((pyautogui.size()[0] * 90 // 100, pyautogui.size()[1] * 90 // 100))
         print(formatted_time + "跳出了今日任务，点击屏幕右下角忽略")
-
-    if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
-    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
 
     if check_image(reconnect_img, 0.9) != None :
         print(formatted_time+"然然触发了游戏重新登陆，脚本退出")
@@ -248,9 +251,12 @@ def click_pass_button():
 
         pyautogui.moveTo(pass_button_pos[0]+ random.uniform(-100, 0), pass_button_pos[1]+ random.uniform(-100, 100), duration=random.uniform(0.6, 1.2))
         pyautogui.moveTo(pass_button_pos, duration=random.uniform(0.6, 1.6))
-        pyautogui.click(pass_button_pos)
-        pyautogui.click(pass_button_pos)
         game_round += 1
+        if check_abnormal_without_stemina():
+            mouse_return_home()
+            return
+        pyautogui.click(pass_button_pos)
+        pyautogui.click(pass_button_pos)
         mouse_return_home()
         print(formatted_time+"点击了空过按钮")
 
@@ -375,13 +381,13 @@ def play_round1(): #用于抽牌
 
     for i in range(7):
         if check_abnormal(): return
-        x = 640 + i*105
+        x = 620 + i*93
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
         pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
         #pyautogui.click()
-        time.sleep(0.8)  # 等待过完动画
+        time.sleep(0.7)  # 等待过完动画
         #------------- OCR ---------------
-        ocrimage = pyautogui.screenshot('ocr.png', region=(x-480, pyautogui.size()[1] - 650, 740, 550))
+        ocrimage = pyautogui.screenshot('ocr.png', region=(x-450, pyautogui.size()[1] - 650, 740, 550))
         ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
         joined_ocrresult = ''.join(ocrresult)
         print(joined_ocrresult)
@@ -389,7 +395,7 @@ def play_round1(): #用于抽牌
 
         special_command = ['西苏精神']
         movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机', '猎兵营'] #某些介绍太长的单位也在列表里
-        postive_buff = ['修复']
+        postive_buff = ['修复', '繁荣']
         negtive_buff = ['抑制', '敌方目标造成', '敌方造成']
         neutral_buff = ['指令']
 
@@ -402,7 +408,7 @@ def play_round1(): #用于抽牌
 
         elif any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
             print(formatted_time + "移动兵力")
-            if 'AGM2' in joined_ocrresult or '第二挺进' in joined_ocrresult:
+            if 'AGM2' in joined_ocrresult or '第二挺进' in joined_ocrresult or '仙台' in joined_ocrresult:
                 drop_card_to_anyzone(mouse_x = x, on_region=second_row)
                 move_click_to_anyzone(mouse_x = x, on_region=enemy_second_row)
             else:
@@ -420,25 +426,29 @@ def play_round1(): #用于抽牌
         elif any(word for word in neutral_buff if word in joined_ocrresult):   #中性buff挠头处理
             print(formatted_time + "中性需要判断buff")
             if '3张' in joined_ocrresult:   #三选一问题,选中间
-                pyautogui.click(pyautogui.size()[0]//2, y=pyautogui.size()[1]//2)
-                pyautogui.click(pyautogui.size()[0]//2, y=pyautogui.size()[1]//2)
+                pyautogui.dragTo(pyautogui.size()[0]//2, y=pyautogui.size()[1]//2)
+                time.sleep(0.5)
+                pyautogui.click(pyautogui.size()[0] // 2, y=pyautogui.size()[1] // 2)
+                pyautogui.click(pyautogui.size()[0] // 2, y=pyautogui.size()[1] // 2)
                 print(formatted_time + "3张, 三选一问题,选中间")
             elif '武士之刃' in joined_ocrresult:  # 直接消灭对方一个单位
-                drop_card_to_anyzone(mouse_x = x, on_region=enemy_second_row)
+                drop_card_to_anyzone(mouse_x = x, on_head=False, on_region=enemy_second_row)
                 print(formatted_time + "武士之刃, 直接消灭对方一个单位")
-            elif '两栖迸攻' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
+            elif '两栖' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
                 drop_card_to_anyzone(mouse_x = x, on_tank=False, on_guard=False, on_region=enemy_second_row)
                 print(formatted_time + "两栖迸攻, 直接消灭对方一个攻击小于3单位")
             elif '虎!' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
                 drop_card_to_anyzone(mouse_x = x, on_tank=False, on_guard=False, on_region=enemy_second_row)
                 print(formatted_time + "虎!, 所有敌方1点伤害")
+            else: pass
         else:
             if front_line_status == 2: #敌方占领前线
-                drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=second_row)
+                drop_card_to_anyzone(mouse_x=x, on_head=True, on_region=second_row)
             else:
-                drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=enemy_second_row)
+                drop_card_to_anyzone(mouse_x=x, on_head=True, on_region=enemy_second_row)
 
         mouse_shake()
+        #time.sleep(0.7)  # 等待过完动画
     mouse_return_home()
 
 def drop_card_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = True, on_region=enemy_second_row):
@@ -488,24 +498,30 @@ def move_click_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True,
     if guard_pos != None and on_guard:
         pyautogui.moveTo(guard_pos, duration=0.9)
         pyautogui.click()
+        pyautogui.click()
     elif infantry_pos != None and on_infantry:
         pyautogui.moveTo(infantry_pos, duration=0.6)
+        pyautogui.click()
         pyautogui.click()
     elif tank_pos != None and on_tank:
         pyautogui.moveTo(tank_pos, duration=0.6)
         pyautogui.click()
+        pyautogui.click()
     elif mortar_pos != None and on_mortar:
         pyautogui.moveTo(mortar_pos, duration=0.7)
+        pyautogui.click()
         pyautogui.click()
     elif fighter_pos != None and on_fighter:
         pyautogui.moveTo(fighter_pos, duration=0.8)
         pyautogui.click()
+        pyautogui.click()
     elif bomber_pos != None and on_bomber:
         pyautogui.moveTo(bomber_pos, duration=0.8)
         pyautogui.click()
+        pyautogui.click()
     elif enemy_headquarters_pos != None and on_head:
-        print('6')
         pyautogui.moveTo(enemy_headquarters_pos, duration=0.9)
+        pyautogui.click()
         pyautogui.click()
     return
 
@@ -589,14 +605,33 @@ def play_round3(): #用于前线
             except Exception as e:
                 print(formatted_time +"阶段3查找Tank异常，可能目标已移动")
 
+def check_abnormal_without_stemina():
+    global ocr_stamina
+    abnormal_state = False
+
+    if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
+    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
+    if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
+        print(formatted_time + "异常检测程序发现 [对手] 字样")
+        abnormal_state = True
+    if check_image(continue_button_image, 0.8, lower_half_screen) != None: #找到继续字样
+        print(formatted_time + "异常检测程序发现 [继续] 字样")
+        abnormal_state = True
+
+    if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
+        print(formatted_time+"[然然]触发了重新登陆，退出")
+        if game_window != None: game_window.minimize()
+        sys.exit(0)
+    return abnormal_state
+
 def check_abnormal():
     global ocr_stamina
     abnormal_state = False
 
-    #check_frontline_status() #顺便,检查一下前线情况
+    check_frontline_status() #顺便,检查一下前线情况
 
-    #if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
-    #if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
+    if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
+    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
         print(formatted_time + "异常检测程序发现 [对手] 字样")
         abnormal_state = True
@@ -612,10 +647,10 @@ def check_abnormal():
     #    print(formatted_time + "异常检测程序发现 [0体力]")
     #    abnormal_state = True
 
-    #if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
-    #    print(formatted_time+"[然然]触发了重新登陆，退出")
-    #    if game_window != None: game_window.minimize()
-    #    sys.exit(0)
+    if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
+        print(formatted_time+"[然然]触发了重新登陆，退出")
+        if game_window != None: game_window.minimize()
+        sys.exit(0)
     return abnormal_state
 
 def reset_game_stage():
@@ -698,7 +733,7 @@ def check_frontline_status():
     gray_img = cv2.cvtColor(cv2image, cv2.COLOR_BGR2GRAY)
     gray_mean_lower = np.mean(gray_img)  # 范围0-255，值越小越黑，越大越白
 
-    if game_round == 0: #保存前线判断灰度值, 在第一轮
+    if game_round == 0 and front_line_upper_base == 0: #保存前线判断灰度值, 在第一轮
         front_line_upper_base = gray_mean_upper
         front_line_lower_base = gray_mean_lower
         print(formatted_time+f"Saved upper G: {front_line_upper_base: .2f} , LowerG: {front_line_lower_base: .2f}")
@@ -711,7 +746,7 @@ def check_frontline_status():
     else:
         front_line_status = 3
     #print(f"Upper base: {front_line_upper_base: .2f} , Lower base: {front_line_lower_base: .2f}")
-    print(formatted_time+f"Upper: {gray_mean_upper: .2f} ,G_lower: {gray_mean_lower: .2f} ,前线状态: " + frontline_status[front_line_status])
+    print(formatted_time+f"上方前线亮度: {gray_mean_upper: .2f} ,下方前线亮度: {gray_mean_lower: .2f} ,前线状态: " + frontline_status[front_line_status])
     return
 
 #-----------------------------------------------MAIN---------------------------------------------------
