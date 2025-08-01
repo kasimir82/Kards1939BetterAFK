@@ -1,8 +1,8 @@
-import pyautogui, time, datetime, pygetwindow as gw, random, keyboard, sys
+import pyautogui, time, datetime, pygetwindow as gw, random, keyboard, sys, easyocr
 from datetime import datetime
 
 # 安装命令：
-# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow keyboard
+# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow keyboard easyocr
 confirm_button_image = "confirm.png" #选派确认按钮
 main_menu_button_image = "mainButton.png" #主菜单按钮
 end_turn_button_image = "endTurn.png" #结束回合按钮
@@ -56,6 +56,7 @@ enemy_second_row = (pyautogui.size()[0]*400//1920, pyautogui.size()[1]*100//1080
 
 pyautogui.FAILSAFE = False
 failsafe_counter = 0
+ocrscanner = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
 
 class TimestampLogger:
     def __init__(self, mode='a'):
@@ -110,6 +111,7 @@ def click_start_game_button():
     global round_total_time #本局总时间
     global round_total_start_time #本局起始时间
     global failsafe_counter
+    global game_window
 
     round_single_time = time.time() - round_start_time
     round_total_time = time.time() - round_total_start_time
@@ -173,12 +175,13 @@ def click_start_game_button():
     error_handling(close_Ad_button_image, "找到了广告，点击叉子")
 
     if check_image(daily_mission_button_image, 0.7, lower_half_screen) != None:
-        pyautogui.moveTo((pyautogui.size()[0]*99//100, pyautogui.size()[1]*99//100), duration=random.uniform(0.6, 1.2))
-        pyautogui.click((pyautogui.size()[0]*99//100, pyautogui.size()[1]*99//100))
+        pyautogui.moveTo((pyautogui.size()[0]*95//100, pyautogui.size()[1]*95//100), duration=random.uniform(0.6, 1.2))
+        pyautogui.click((pyautogui.size()[0]*95//100, pyautogui.size()[1]*95//100))
         print(formatted_time + "触发了今日任务，点击屏幕右下角忽略")
 
     if check_image(reconnect_img, 0.9) != None :
         print(formatted_time+"然然触发了重新登陆，退出")
+        if game_window != None: game_window.minimize()
         #logger.close()
         sys.exit(0)
 
@@ -323,24 +326,56 @@ def play_cards():
             
     #time.sleep(random.uniform(0.5, 0.9))
 
-def play_round1():
+def play_round1(): #用于抽牌
     global enemy_headquarters_pos
     print(formatted_time +"第1轮出牌，抽最下面的牌") #阶段1，抽牌
     time.sleep(1)  # 等待过完动画
+    mouse_coeff = 70
     for i in range(6):
         if check_abnormal():
             print(formatted_time +"阶段1体力用完或者发现异常，退出打牌循环")
             return
-        x = 720 + i * random.uniform(90, 100)
+        x = 720 + i*110
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
-        pyautogui.click(x, y=pyautogui.size()[1] - 100)
-        if enemy_headquarters_pos != None:
-            pyautogui.dragTo(enemy_headquarters_pos, duration=0.6)
-        else:
-            pyautogui.dragTo(x, y=pyautogui.size()[1]//2, duration=0.6)
+        pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_coeff)
+        time.sleep(0.5)  # 等待过完动画
+        #------------- OCR ---------------
+        ocrimage = pyautogui.screenshot('ocr.png', region=( x-470, pyautogui.size()[1] - 650  , 670, 600))
+        ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
+        print(list(ocrresult))
+        # ------------- OCR ---------------
+
+        movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机']
+        special_command = ['西苏精神']
+        postive_buff = ['修复', '哈哈']
+        negtive_buff = ['抑制', '伤害']
+        neutral_buff = ['抽一张']
+
+        if any(key in ocrresult for key in special_command):   #特殊指令
+            pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+            pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.8)  # 按照一定的顺序把牌丢出去
+        if any(key in ocrresult for key in movable_unit):   #移动兵力
+            pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+            pyautogui.dragTo((pyautogui.size()[0]//2, pyautogui.size()[1]*2//3), duration=0.6)
+        if any(key in ocrresult for key in negtive_buff):   #把负面buff扔给敌人
+            pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+            guard_pos = check_image(guard_image, 0.8, enemy_second_row)
+            tank_pos = check_image(tank_image, 0.8, enemy_second_row)
+            infantry_pos = check_image(infantry_image, 0.8, enemy_second_row)
+            if guard_pos != None:
+                pyautogui.dragTo(guard_pos, duration=0.6)
+            elif infantry_pos != None:
+                pyautogui.dragTo(infantry_pos, duration=0.6)
+            elif tank_pos != None:
+                pyautogui.dragTo(tank_pos, duration=0.6)
+        if any(key in ocrresult for key in postive_buff):   #正面buff扔给自己
+            pass
+        if any(key in ocrresult for key in neutral_buff):   #中性buff扔给自己
+            pyautogui.click(x, y=pyautogui.size()[1] - mouse_coeff)
+            pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.8)  # 按照一定的顺序把牌丢出去
         mouse_return_home()
 
-def play_round2():
+def play_round2(): #用于移动支援线
     global game_round
 
     time.sleep(1)  # 等待过完动画
@@ -376,7 +411,7 @@ def play_round2():
         print(formatted_time +"阶段2查找Tank异常，可能没有目标")
         return
                 
-def play_round3():
+def play_round3(): #用于前线
     global game_round    
     global enemy_headquarters_pos
 
@@ -495,6 +530,7 @@ def main():
     global formatted_time
     global enemy_headquarters_pos
     global round_total_start_time
+    global game_window
 
     game_active = False
     round_total_start_time = time.time()
@@ -536,18 +572,25 @@ def debug_testing():
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
 
-        try:
-            guard_pos = pyautogui.locateAllOnScreen(frontline_images[1], confidence=0.8, region=all_screen, grayscale=True)
-            guard_pos_box = filter_boxes(guard_pos, 5)
-            print(list(guard_pos_box))
-        except Exception as e:
-            print("Not found All")
-        try:
-            for images in frontline_images:
-                guard_pos = check_image(images, 0.8, all_screen)
-                print(guard_pos)
-        except Exception as e:
-            print("Not found 1")
+        mouse_x, mouse_y = pyautogui.position()
+        x = 720
+        ocrimage = pyautogui.screenshot('ocr.png', region=(x-630, pyautogui.size()[1]-100 - 892 , 390, 470))
+        ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
+        print(list(ocrresult))
+
+        if False:
+            try:
+                guard_pos = pyautogui.locateAllOnScreen(frontline_images[1], confidence=0.8, region=all_screen, grayscale=True)
+                guard_pos_box = filter_boxes(guard_pos, 5)
+                print(list(guard_pos_box))
+            except Exception as e:
+                print("Not found All")
+            try:
+                for images in frontline_images:
+                    guard_pos = check_image(images, 0.8, all_screen)
+                    print(guard_pos)
+            except Exception as e:
+                print("Not found 1")
 
         while True:
             reset_game_stage()
