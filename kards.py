@@ -1,6 +1,6 @@
 import pyautogui, time, datetime, pygetwindow as gw, random, keyboard, sys, easyocr
 from datetime import datetime
-import cv2
+import cv2, numpy as np
 # 安装命令：
 # pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow keyboard easyocr
 confirm_button_image = "confirm.png" #选派确认按钮
@@ -49,6 +49,15 @@ left_half_screen = (0, 0, pyautogui.size()[0]//2, pyautogui.size()[1]) #屏幕�
 right_half_screen = (pyautogui.size()[0]//2, 0, pyautogui.size()[0]//2, pyautogui.size()[1]) #屏幕右半
 left_onethird_screen = (0, 0, pyautogui.size()[0]//3, pyautogui.size()[1]) #屏幕左三分之一
 right_onethird_screen = (pyautogui.size()[0]*2//3, 0, pyautogui.size()[0]//3, pyautogui.size()[1]) #屏幕右三分之一
+ninegong_zone1 = (0, 0, pyautogui.size()[0]//3, pyautogui.size()[1]//3) #以下九个为屏幕九宫格
+ninegong_zone2 = (pyautogui.size()[0]//3, 0, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone3 = (pyautogui.size()[0]*2//3, 0, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone4 = (0, pyautogui.size()[1]//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone5 = (pyautogui.size()[0]//3, pyautogui.size()[1]//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone6 = (pyautogui.size()[0]*2//3, pyautogui.size()[1]//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone7 = (0, pyautogui.size()[1]*2//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone8 = (pyautogui.size()[0]//3, pyautogui.size()[1]*2//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3)
+ninegong_zone9 = (pyautogui.size()[0]*2//3, pyautogui.size()[1]*2//3, pyautogui.size()[0]//3, pyautogui.size()[1]//3) #以上九个为屏幕九宫格
 zero_tili_region = (0, pyautogui.size()[1]*790//1080, pyautogui.size()[0]*200//1920, (1080 - 790)) #0体力区域
 pass_button_region = (pyautogui.size()[0]*1607//1920,pyautogui.size()[1]*622//1080, 270, 130) #空过按钮区域
 second_row = (pyautogui.size()[0]*313//1920, pyautogui.size()[1]*643//1080, 1259 , 263) #支援战线区域
@@ -56,11 +65,15 @@ third_row = (pyautogui.size()[0]*333//1920, pyautogui.size()[1]*397//1080, 1417,
 enemy_guard_zone = (pyautogui.size()[0]*431//1920, pyautogui.size()[1]*129//1080, 1075, 161) #敌方支援区域状态区域
 enemy_second_row = (pyautogui.size()[0]*400//1920, pyautogui.size()[1]*100//1080, 1143, 289) #地方支援区域
 ocr_stamina_region = (32, 849, 53, 76) #体力数值区域
+front_line_upper_region = (420, 370, 1000, 37) #上面前线条表达区域
+front_line_lower_region = (420, 635, 1000, 37) #下面前线条表达区域
+
 
 pyautogui.FAILSAFE = False
 failsafe_counter = 0
 ocr_stamina = 0
 ocrscanner = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
+front_line_status = 0  #0代表中立 1代表被我占领 2代表地方占领
 
 class TimestampLogger:
     def __init__(self, mode='a'):
@@ -95,12 +108,12 @@ class Box:
         return f"Box(left={self.left}, top={self.top}, width={self.width}, height={self.height})"
         
 def gameround_timeout_bug_reset(): #有时候20s倒计时失效，此时对局5分钟以后选择自爆
-    if check_image(gear_img, 0.8, right_onethird_screen) != None :
+    if check_image(gear_img, 0.8, ninegong_zone3) != None :
         pyautogui.moveTo(return_img_pos, duration=random.uniform(0.6, 1.2))
         time.sleep(0.2)
         pyautogui.click(return_img_pos)
         time.sleep(0.2)
-    if check_image(self_destruct_img, 0.8, right_onethird_screen) != None :
+    if check_image(self_destruct_img, 0.8, ninegong_zone3) != None :
         pyautogui.moveTo(return_img_pos, duration=random.uniform(0.6, 1.2))
         time.sleep(0.2)
         pyautogui.click(return_img_pos)
@@ -486,24 +499,27 @@ def play_round3(): #用于前线
 def check_abnormal():
     global ocr_stamina
     abnormal_state = False
+
+    check_frontline_status() #顺便,检查一下前线情况
+
     if check_image(mission_failed_image, 0.7, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
-    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "检测到本局失败, 记录一下")
+    if check_image(mission_passed_image, 0.7, all_screen) != None: print(formatted_time + "本局胜利")
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
-        print(formatted_time + "异常检测程序发现 对手 字样")
+        print(formatted_time + "异常检测程序发现 [对手] 字样")
         abnormal_state = True
     if check_image(continue_button_image, 0.8, lower_half_screen) != None: #找到继续字样
-        print(formatted_time + "异常检测程序发现 继续 字样")
+        print(formatted_time + "异常检测程序发现 [继续] 字样")
         abnormal_state = True
     if True: # -------------- OCR ----------------
         ocr_check_stamina()
         if ocr_stamina == 0:
-            print(formatted_time + "OCR发现0体力")
+            print(formatted_time + "OCR发现 [0体力]")
             abnormal_state = True
     if check_image(zero_tili, 0.92, zero_tili_region, False) != None: #找到体力为0
-        print(formatted_time + "异常检测程序发现 0体力")
+        print(formatted_time + "异常检测程序发现 [0体力]")
         abnormal_state = True
     if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
-        print(formatted_time+"然然触发了重新登陆，退出")
+        print(formatted_time+"[然然]触发了重新登陆，退出")
         if game_window != None: game_window.minimize()
         sys.exit(0)
     return abnormal_state
@@ -569,6 +585,29 @@ def error_handling(input_img = start_scale125_img, output_string = "Error Handli
     else:
         return False
 
+def check_frontline_status():
+    global frontline_status
+
+    frontline_status = 0
+    ocrimage = pyautogui.screenshot('frontline1.png', region=front_line_upper_region)
+    cv2image = cv2.imread('frontline1.png')
+    gray_img = cv2.cvtColor(cv2image, cv2.COLOR_BGR2GRAY)
+    gray_mean_upper = np.mean(gray_img)  # 范围0-255，值越小越黑，越大越白
+
+    ocrimage = pyautogui.screenshot('frontline2.png', region=front_line_lower_region)
+    cv2image = cv2.imread('frontline2.png')
+    gray_img = cv2.cvtColor(cv2image, cv2.COLOR_BGR2GRAY)
+    gray_mean_lower = np.mean(gray_img)  # 范围0-255，值越小越黑，越大越白
+
+    if gray_mean_upper > gray_mean_lower and gray_mean_upper - gray_mean_lower > 1:  #3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+        frontline_status = 2
+    elif gray_mean_upper < gray_mean_lower and gray_mean_lower - gray_mean_upper > 1:
+        frontline_status = 1
+    else:
+        frontline_status = 3
+    print(f"G_upper: {gray_mean_upper: .3f} ,G_lower: {gray_mean_lower: .3f} ,Frontline status: " + str(frontline_status))
+    return
+
 #-----------------------------------------------MAIN---------------------------------------------------
 def main():
     global game_stage
@@ -622,27 +661,19 @@ def ocr_check_stamina(): #Check Stamina by using OCR
 
 def debug_testing():
     global formatted_time
-    #if True: #For debug
-    if True:
+
+    if False:#For debug
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
 
         #mouse_x, mouse_y = pyautogui.position()
         #x = 720
-        #ocrimage = pyautogui.screenshot('frontline.png', region=(420, 360 , 1000, 40))
+
         #ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
         #print(list(ocrresult))
-        front_line_upper_region = (420, 360 , 1000, 40)
-        blackcolor_counter = 0
+        check_frontline_status()
         #i = pyautogui.pixelMatchesColor(front_line_upper_region[0] , front_line_upper_region[1] , (36, 22, 15), tolerance=20)  # 检测前线线条黑色占比
         #print(i)
-        for x in range(40):
-            print(x)
-            for y in range(front_line_upper_region[3]):
-                if pyautogui.pixelMatchesColor(front_line_upper_region[0] + x, front_line_upper_region[1] + y, (36, 22, 15), tolerance=30): #检测前线线条黑色占比
-                    blackcolor_counter += 1
-        print(blackcolor_counter)
-
 
         if False:
             try:
