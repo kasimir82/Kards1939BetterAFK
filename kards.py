@@ -74,7 +74,7 @@ enemy_second_row = (pyautogui.size()[0]*400//1920, pyautogui.size()[1]*100//1080
 ocr_stamina_region = (32, 849, 53, 76) #体力数值区域
 front_line_upper_region = (420, 370, 1000, 37) #上面前线条表达区域
 front_line_lower_region = (420, 635, 1000, 37) #下面前线条表达区域
-card_search_region = (pyautogui.size()[0]*20//100, pyautogui.size()[1]*25//100, pyautogui.size()[0]*60//100,pyautogui.size()[1]*75//100)
+card_search_region = (pyautogui.size()[0]*10//100, pyautogui.size()[1]*30//100, pyautogui.size()[0]*80//100,pyautogui.size()[1]*70//100)#卡牌详细信息的搜索区域
 
 #Global Veriables
 ocrscanner = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
@@ -87,10 +87,11 @@ front_line_lower_base = 0
 game_stage = 0
 game_round = 0
 ocr_stamina = 0
-mouse_yaxis_coeff = 60
+mouse_yaxis_coeff = 50
 enemy_headquarters_pos = None
 current_card_cost = 1
-frontline_status = ['未知','我占了','敌方','中立']
+frontline_status = ['状态未知','我方占领','敌方占领','无人占领']
+kmark_location = (0,0)
 
 class LogRedirector:
 
@@ -159,7 +160,7 @@ def click_start_game_button():
 
     round_single_time = time.time() - round_start_time
     round_total_time = time.time() - round_total_start_time
-    print(formatted_time+f"开始跑流程:{game_stage},轮次:{game_round},本轮耗时{round_single_time:.0f}秒，全局{round_total_time:.0f}秒,体力:{ocr_stamina},前线状态:" + frontline_status[front_line_status]) #game_stage保证了进入对局的点击顺序
+    print(formatted_time+f"开始跑流程:{game_stage},轮次:{game_round},本轮耗时{round_single_time:.0f}秒，本局耗时{round_total_time:.0f}秒,前线状态:" + frontline_status[front_line_status]) #game_stage保证了进入对局的点击顺序
     
     if round_single_time > 60 * 6:   #游戏倒计时超时以后bug处理
         gameround_timeout_bug_reset()
@@ -267,7 +268,7 @@ def send_message():
     if want_to > 75 and game_round >= 1:
         if check_image(msg_img, 0.9, right_onethird_screen) != None :
             pyautogui.moveTo(return_img_pos, duration=random.uniform(0.6, 1.2))
-            #time.sleep(0.2)
+            time.sleep(0.2)
             pyautogui.click(return_img_pos)
             #pyautogui.click(return_img_pos)
             print(formatted_time+f"开始插入聊天，聊第{random_msg_number}条天")
@@ -282,9 +283,9 @@ def send_message():
             if random_msg_number == 5:
                 pyautogui.move(92-204, 252-360, duration=random.uniform(0.6, 1.2)) #编号8 打得不错我的朋友
             pyautogui.click()
-            #time.sleep(0.2)
+            time.sleep(0.2)
             pyautogui.click()
-            #time.sleep(0.2)
+            time.sleep(0.2)
             mouse_return_home()
 
 def play_cards():
@@ -374,9 +375,11 @@ def play_cards():
 def ocr_check_card_cost():
     global return_img_pos
     global current_card_cost
+    global kmark_location
 
     check_image(kmark_image, confidence_level=0.9, step_opt=0.01, failcount=20,detect_region=card_search_region)
     if return_img_pos != None:
+        kmark_location = (int(return_img_pos[0]) , int(return_img_pos[1]))
         x1 = int(return_img_pos[0] - 43)
         y1 = int(return_img_pos[1] - 5)
         crop_region = (x1, y1, 33, 50)
@@ -385,11 +388,11 @@ def ocr_check_card_cost():
             ratio, mask = calculate_orange_ratio('ocr_cardcost.png')
         except Exception as e: pass
         if ratio < 10:
-            print(formatted_time + f"橙色所占比例: {ratio:.2f}%, 灰色数字卡牌直接跳过")
+            print(formatted_time + f"橙色所占比例: {ratio:.1f}%, 灰色数字卡牌直接跳过")
             current_card_cost = 99  # 未找到卡消耗,给一个假的
             return current_card_cost
         else:
-            print(formatted_time +f"橙色所占比例: {ratio:.2f}%, 橙色卡牌通过,继续OCR")
+            print(formatted_time +f"橙色所占比例: {ratio:.1f}%, 橙色卡牌通过,继续OCR")
             ocrresult = ocrscanner.readtext('ocr_cardcost.png', ['ru', 'en'], mag_ratio=1, detail=0, allowlist='0123456789')
             if ocrresult != []:
                 joined_ocrresult = ''.join(ocrresult)
@@ -401,6 +404,7 @@ def ocr_check_card_cost():
                 return current_card_cost
     else:
         current_card_cost = 99  # 未找到卡消耗,给一个假的
+        kmark_location = (0,0)
         return current_card_cost
 
 def play_round1(): #用于抽牌
@@ -411,9 +415,9 @@ def play_round1(): #用于抽牌
     #time.sleep(1)  # 等待过完抽卡动画
     check_frontline_status()  # 顺便,检查一下前线情况
 
-    for i in range(7):
+    for i in range(9):
         if check_abnormal(): return
-        x = 620 + i*93
+        x = 600 + i * random.randint(85, 95)
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
         pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
         pyautogui.click()
@@ -421,10 +425,16 @@ def play_round1(): #用于抽牌
         ocr_check_card_cost()
         ocr_check_stamina()
         if current_card_cost <= ocr_stamina:
-            print(formatted_time + f"当前手牌消耗{current_card_cost}低于体力{ocr_stamina}")
+            print(formatted_time + f"当前手牌消耗 {current_card_cost} 小于等于体力 {ocr_stamina} ")
             #------------- OCR ---------------
-            ocrimage = pyautogui.screenshot('ocr.png', region=(x-450, pyautogui.size()[1] - 650, 740, 550))
-            ocrresult = ocrscanner.readtext('ocr.png', detail = 0)
+            if i >= 7: xaxis_coeff = 100 #最右边缘的牌需要加成
+            else: xaxis_coeff = 0
+            if kmark_location[0] != 0:
+                ocrimage = pyautogui.screenshot('ocr_card.png',
+                                                region=(kmark_location[0] - 390, kmark_location[1] - 30, 710, 550))
+            else:
+                ocrimage = pyautogui.screenshot('ocr_card.png', region=(x-450-xaxis_coeff, pyautogui.size()[1] - 650, 740, 550))
+            ocrresult = ocrscanner.readtext('ocr_card.png', detail = 0)
             joined_ocrresult = ''.join(ocrresult)
             print(joined_ocrresult)
             # ------------- OCR ---------------
@@ -444,10 +454,19 @@ def play_round1(): #用于抽牌
 
             elif any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                 print(formatted_time + "移动兵力")
-                if 'AGM2' in joined_ocrresult or '第二挺进' in joined_ocrresult or '仙台' in joined_ocrresult:
+                if '零战' in joined_ocrresult or '第二挺进' in joined_ocrresult or '仙台' in joined_ocrresult:
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.3)  # 按照一定的顺序把牌丢出去
-                    drop_card_to_anyzone(card_index = x, on_head=False,on_region=enemy_second_row)
+                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.7)  # 按照一定的顺序把牌丢出去
+
+                    guard_pos = check_image(guard_image, 0.8, enemy_second_row)
+                    if guard_pos != None: pyautogui.moveTo((guard_pos[0] - 60, guard_pos[1] + 80), duration=0.5)
+                    infantry_pos = check_image(infantry_image, 0.8, enemy_second_row)
+                    if infantry_pos != None: pyautogui.moveTo(infantry_pos, duration=0.6)
+                    tank_pos = check_image(tank_image, 0.8, enemy_second_row)
+                    if tank_pos != None: pyautogui.moveTo(tank_pos, duration=0.6)
+                    enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, enemy_second_row)
+                    if enemy_headquarters_pos != None: pyautogui.moveTo(enemy_headquarters_pos, duration=0.6)
+                    pyautogui.click()
                     pyautogui.click()
                 else:
                     pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.3)
@@ -522,7 +541,7 @@ def drop_card_to_anyzone(card_index=0, on_guard=True, on_infantry=True, on_tank=
                                 enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
                                 if enemy_headquarters_pos != None: pyautogui.dragTo(enemy_headquarters_pos, duration=0.9)
                                 else:
-                                    pyautogui.dragTo((pyautogui.size()[0]//2+ random.choice([-1, 1])*51, pyautogui.size()[1]//2),duration=0.3)
+                                    pyautogui.dragTo((pyautogui.size()[0]//2+ random.choice([-1, 1])*51, pyautogui.size()[1]*37//100),duration=0.5)
 
 def play_round2(): #用于移动支援线
     global game_round
@@ -824,12 +843,12 @@ def debug_testing():
     global formatted_time
     global return_img_pos
 
-    if False:#For debug
+    if False:#For debugging
         now = datetime.now()
-        formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
+        formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
+# ---------------- Debug Section Start --------------------
 
-        print('cost:')
-        print(ocr_check_card_cost())
+        play_round1()
 
 # ---------------- Debug Section End --------------------
         print("Forever Loop")
