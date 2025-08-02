@@ -236,7 +236,6 @@ def click_start_game_button():
         #logger.close()
         sys.exit(0)
 
-
 def click_pass_button():
     global game_round
     global round_start_time
@@ -441,53 +440,51 @@ def play_round1(): #用于抽牌
                 if '西苏精神' in joined_ocrresult: #转移伤害给敌方总部
                     print(formatted_time + "西苏精神, 转移伤害给敌方总部")
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.5)  # 按照一定的顺序把牌丢出去
+                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.3)  # 按照一定的顺序把牌丢出去
 
             elif any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                 print(formatted_time + "移动兵力")
                 if 'AGM2' in joined_ocrresult or '第二挺进' in joined_ocrresult or '仙台' in joined_ocrresult:
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.5)  # 按照一定的顺序把牌丢出去
-                    drop_card_to_anyzone(mouse_x = x, on_head=False,on_region=enemy_second_row)
+                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.3)  # 按照一定的顺序把牌丢出去
+                    drop_card_to_anyzone(card_index = x, on_head=False,on_region=enemy_second_row)
+                    pyautogui.click()
                 else:
+                    pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.3)
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.6)
+                    pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.3)
+
             elif any(word for word in negtive_buff if word in joined_ocrresult):   #把负面buff扔给敌人
                 print(formatted_time + "负面buff")
-                drop_card_to_anyzone(mouse_x = x, on_head=False, on_region=enemy_second_row)
+                drop_card_to_anyzone(card_index = x, on_head=False, on_region=enemy_second_row)
 
             elif any(word for word in postive_buff if word in joined_ocrresult):   #正面buff扔给自己
                 print(formatted_time + "正面buff")
-                drop_card_to_anyzone(mouse_x = x, on_head=False, on_guard=False, on_region=second_row)
+                drop_card_to_anyzone(card_index = x, on_head=False, on_guard=False, on_region=second_row)
 
             elif any(word for word in neutral_buff if word in joined_ocrresult):   #中性buff挠头处理
                 print(formatted_time + "中性需要判断buff")
                 if '3张' in joined_ocrresult:   #三选一问题,选中间
+                    pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.3)
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                     pyautogui.dragTo(x, y=pyautogui.size()[1]//2)
                     time.sleep(3)
                     pyautogui.click(pyautogui.size()[0] // 2, y=pyautogui.size()[1] // 2)
                     pyautogui.click(pyautogui.size()[0] // 2, y=pyautogui.size()[1] // 2)
                     print(formatted_time + "3张, 三选一问题,选中间")
-                elif '武士之刃' in joined_ocrresult:  # 直接消灭对方一个单位
-                    drop_card_to_anyzone(mouse_x = x, on_head=False, on_region=enemy_second_row)
-                    print(formatted_time + "武士之刃, 直接消灭对方一个单位")
-                elif '两栖' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
-                    drop_card_to_anyzone(mouse_x = x, on_tank=False, on_guard=False, on_region=enemy_second_row)
+                elif '两栖' in joined_ocrresult or '虎!' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
+                    drop_card_to_anyzone(card_index = x, on_tank=False, on_guard=False, on_region=enemy_second_row)
                     print(formatted_time + "两栖迸攻, 直接消灭对方一个攻击小于3单位")
-                elif '虎!' in joined_ocrresult:  # 直接消灭对方一个攻击小于3单位
-                    drop_card_to_anyzone(mouse_x = x, on_tank=False, on_guard=False, on_region=enemy_second_row)
-                    print(formatted_time + "虎!, 所有敌方1点伤害")
                 else:
-                    if front_line_status == 2:  # 敌方占领前线
-                        drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=second_row)
+                    if front_line_status == 2:  # 敌方占领前线,往前线扔
+                        drop_card_to_anyzone(card_index=x, on_head=False, on_region=second_row)
                     else:
-                        drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=enemy_second_row)
+                        drop_card_to_anyzone(card_index=x, on_head=False, on_region=enemy_second_row)
             else:
-                if front_line_status == 2: #敌方占领前线
-                    drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=second_row)
+                if front_line_status == 2: # 敌方占领前线,往前线扔
+                    drop_card_to_anyzone(card_index=x, on_head=False, on_region=second_row)
                 else:
-                    drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=enemy_second_row)
+                    drop_card_to_anyzone(card_index=x, on_head=False, on_region=enemy_second_row)
 
             time.sleep(2)  # 卡牌发出, 等待过完动画
         else:
@@ -496,11 +493,12 @@ def play_round1(): #用于抽牌
         #time.sleep(0.7)  # 等待过完动画
     mouse_return_home()
 
-def drop_card_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = True, on_region=enemy_second_row):
+def drop_card_to_anyzone(card_index=0, on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = True, on_region=enemy_second_row):
     global enemy_headquarters_pos
     global mouse_yaxis_coeff
 
-    pyautogui.click(mouse_x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
+    pyautogui.moveTo(x=card_index, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.3)
+    pyautogui.click(x=card_index, y=pyautogui.size()[1] - mouse_yaxis_coeff)
 
     if on_guard:
         guard_pos = check_image(guard_image, 0.8, on_region)
@@ -524,7 +522,7 @@ def drop_card_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True, 
                                 enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
                                 if enemy_headquarters_pos != None: pyautogui.dragTo(enemy_headquarters_pos, duration=0.9)
                                 else:
-                                    pyautogui.dragTo((pyautogui.size()[0]//2+ random.choice([-1, 1])*51, pyautogui.size()[1]//2),duration=0.5)
+                                    pyautogui.dragTo((pyautogui.size()[0]//2+ random.choice([-1, 1])*51, pyautogui.size()[1]//2),duration=0.3)
 
 def play_round2(): #用于移动支援线
     global game_round
@@ -759,6 +757,19 @@ def check_frontline_status():
     print(formatted_time+f"上方前线亮度: {gray_mean_upper: .2f} ,下方前线亮度: {gray_mean_lower: .2f} ,前线状态: " + frontline_status[front_line_status])
     return
 
+def calculate_orange_ratio(image_path):
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"无法读取图像: {image_path}")
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_orange = np.array([10, 100, 100])
+    upper_orange = np.array([25, 255, 255])
+    orange_mask = cv2.inRange(hsv_image, lower_orange, upper_orange)
+    orange_pixels = cv2.countNonZero(orange_mask)
+    total_pixels = image.shape[0] * image.shape[1]
+    orange_ratio = (orange_pixels / total_pixels) * 100
+    return orange_ratio, orange_mask
+
 #-----------------------------------------------MAIN---------------------------------------------------
 def main():
     global game_stage
@@ -807,18 +818,7 @@ def ocr_check_stamina(): #Check Stamina by using OCR
             ocr_stamina = 0
     return ocr_stamina
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
-def calculate_orange_ratio(image_path):
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError(f"无法读取图像: {image_path}")
-    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower_orange = np.array([10, 100, 100])
-    upper_orange = np.array([25, 255, 255])
-    orange_mask = cv2.inRange(hsv_image, lower_orange, upper_orange)
-    orange_pixels = cv2.countNonZero(orange_mask)
-    total_pixels = image.shape[0] * image.shape[1]
-    orange_ratio = (orange_pixels / total_pixels) * 100
-    return orange_ratio, orange_mask
+
 
 def debug_testing():
     global formatted_time
