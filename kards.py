@@ -376,17 +376,33 @@ def ocr_check_card_cost():
     global return_img_pos
     global current_card_cost
 
-    check_image(kmark_image, 0.8, step_opt=0.02, detect_region=card_search_region)
-    #print(card_search_region)
+    check_image(kmark_image, confidence_level=0.9, step_opt=0.01, failcount=20,detect_region=card_search_region)
     if return_img_pos != None:
         x1 = int(return_img_pos[0] - 43)
         y1 = int(return_img_pos[1] - 5)
         crop_region = (x1, y1, 33, 50)
         ocrimage = pyautogui.screenshot('ocr_cardcost.png', region=crop_region)
-        ocrresult = ocrscanner.readtext('ocr_cardcost.png', ['ru', 'en'], mag_ratio=1, detail=0, allowlist='0123456789')
-        joined_ocrresult = ''.join(ocrresult)
-        current_card_cost = int(float(joined_ocrresult))
-        #print('Current Card Cost Found: ' + joined_ocrresult)
+        try:
+            ratio, mask = calculate_orange_ratio('ocr_cardcost.png')
+        except Exception as e: pass
+        if ratio < 10:
+            print(formatted_time + f"橙色所占比例: {ratio:.2f}%, 灰色数字卡牌直接跳过")
+            current_card_cost = 99  # 未找到卡消耗,给一个假的
+            return current_card_cost
+        else:
+            print(formatted_time +f"橙色所占比例: {ratio:.2f}%, 橙色卡牌通过,继续OCR")
+            ocrresult = ocrscanner.readtext('ocr_cardcost.png', ['ru', 'en'], mag_ratio=1, detail=0, allowlist='0123456789')
+            if ocrresult != []:
+                joined_ocrresult = ''.join(ocrresult)
+                current_card_cost = int(float(joined_ocrresult))
+                return current_card_cost
+                # print('Current Card Cost Found: ' + joined_ocrresult)
+            else:
+                current_card_cost = 99 #未找到卡消耗,给一个假的
+                return current_card_cost
+    else:
+        current_card_cost = 99  # 未找到卡消耗,给一个假的
+        return current_card_cost
 
 def play_round1(): #用于抽牌
     global enemy_headquarters_pos
@@ -402,7 +418,7 @@ def play_round1(): #用于抽牌
         #pyautogui.moveTo(x, y=pyautogui.size()[1] - 100, duration=random.uniform(0.2, 0.6))
         pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
         pyautogui.click()
-        time.sleep(0.5)  # 等待过完动画
+        #time.sleep(0.9)  # 等待过完动画
         ocr_check_card_cost()
         ocr_check_stamina()
         if current_card_cost <= ocr_stamina:
@@ -432,7 +448,7 @@ def play_round1(): #用于抽牌
                 if 'AGM2' in joined_ocrresult or '第二挺进' in joined_ocrresult or '仙台' in joined_ocrresult:
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                     pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.5)  # 按照一定的顺序把牌丢出去
-                    move_click_to_anyzone(mouse_x = x, on_head=False,on_region=enemy_second_row)
+                    drop_card_to_anyzone(mouse_x = x, on_head=False,on_region=enemy_second_row)
                 else:
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                     pyautogui.dragTo((x, pyautogui.size()[1]//2), duration=0.6)
@@ -472,8 +488,10 @@ def play_round1(): #用于抽牌
                     drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=second_row)
                 else:
                     drop_card_to_anyzone(mouse_x=x, on_head=False, on_region=enemy_second_row)
+
+            time.sleep(2)  # 卡牌发出, 等待过完动画
         else:
-            print(formatted_time + f"当前手牌消耗{current_card_cost}高力{ocr_stamina},中断")
+            print(formatted_time + f"当前手牌消耗{current_card_cost}高于体力{ocr_stamina},中断")
         #mouse_shake()
         #time.sleep(0.7)  # 等待过完动画
     mouse_return_home()
@@ -484,76 +502,29 @@ def drop_card_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True, 
 
     pyautogui.click(mouse_x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
 
-    guard_pos = check_image(guard_image, 0.8, on_region)
-    if guard_pos != None and on_guard:
-        pyautogui.dragTo((guard_pos[0]- 60,guard_pos[1]+80), duration=0.9)
-    else:
-        infantry_pos = check_image(infantry_image, 0.8, on_region)
-        if infantry_pos != None and on_infantry:
-            pyautogui.dragTo(infantry_pos, duration=0.6)
-        else:
-            tank_pos = check_image(tank_image, 0.8, on_region)
-            if tank_pos != None and on_tank:
-                pyautogui.dragTo(tank_pos, duration=0.6)
-            else:
-                mortar_pos = check_image(mortar_image, 0.8, on_region)
-                if mortar_pos != None and on_mortar:
-                    pyautogui.dragTo(mortar_pos, duration=0.7)
-                else:
-                    fighter_pos = check_image(fighter_image, 0.8, on_region)
-                    if fighter_pos != None and on_fighter:
-                        pyautogui.dragTo(fighter_pos, duration=0.8)
-                    else:
-                        bomber_pos = check_image(bomber_image, 0.8, on_region)
-                        if bomber_pos != None and on_bomber:
-                            pyautogui.dragTo(bomber_pos, duration=0.8)
-                        else:
-                            enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
-                            if enemy_headquarters_pos != None and on_head:
-                                pyautogui.dragTo(enemy_headquarters_pos, duration=0.9)
-                            else:
-                                pyautogui.dragTo((pyautogui.size()[0]//2, pyautogui.size()[1]//2),duration=0.7)
-    return
-
-def move_click_to_anyzone(mouse_x=0, mouse_y=0, on_guard=True, on_infantry=True, on_tank=True, on_mortar=True, on_fighter=True, on_bomber=True, on_head = True, on_region=enemy_second_row):
-    global enemy_headquarters_pos
-    global mouse_yaxis_coeff
-
-    #pyautogui.click(mouse_x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-
-    guard_pos = check_image(guard_image, 0.8, on_region)
-    infantry_pos = check_image(infantry_image, 0.8, on_region)
-    tank_pos = check_image(tank_image, 0.8, on_region)
-    mortar_pos = check_image(mortar_image, 0.8, on_region)
-    fighter_pos = check_image(fighter_image, 0.8, on_region)
-    bomber_pos = check_image(bomber_image, 0.8, on_region)
-    enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
-
-    if guard_pos != None and on_guard:
-        pyautogui.moveTo((guard_pos[0]- 60,guard_pos[1]+80), duration=0.9)
-    elif infantry_pos != None and on_infantry:
-        pyautogui.moveTo(infantry_pos, duration=0.6)
-    elif tank_pos != None and on_tank:
-        pyautogui.moveTo(tank_pos, duration=0.6)
-    elif mortar_pos != None and on_mortar:
-        pyautogui.moveTo(mortar_pos, duration=0.7)
-    elif fighter_pos != None and on_fighter:
-        pyautogui.moveTo(fighter_pos, duration=0.8)
-    elif bomber_pos != None and on_bomber:
-        pyautogui.moveTo(bomber_pos, duration=0.8)
-    elif enemy_headquarters_pos != None and on_head:
-        pyautogui.moveTo(enemy_headquarters_pos, duration=0.9)
-    else:
-        pyautogui.moveTo((pyautogui.size()[0] // 2, pyautogui.size()[1] // 2), duration=0.7)
-    time.sleep(0.1)
-    pyautogui.click()
-    time.sleep(0.1)
-    pyautogui.click()
-    time.sleep(0.1)
-    pyautogui.click()
-    time.sleep(0.1)
-    pyautogui.click()
-    return
+    if on_guard:
+        guard_pos = check_image(guard_image, 0.8, on_region)
+        if guard_pos != None: pyautogui.dragTo((guard_pos[0]- 60,guard_pos[1]+80), duration=0.9)
+        elif on_infantry:
+            infantry_pos = check_image(infantry_image, 0.8, on_region)
+            if infantry_pos != None: pyautogui.dragTo(infantry_pos, duration=0.6)
+            elif on_tank:
+                tank_pos = check_image(tank_image, 0.8, on_region)
+                if tank_pos != None: pyautogui.dragTo(tank_pos, duration=0.6)
+                elif on_mortar:
+                    mortar_pos = check_image(mortar_image, 0.8, on_region)
+                    if mortar_pos != None: pyautogui.dragTo(mortar_pos, duration=0.7)
+                    elif on_fighter:
+                        fighter_pos = check_image(fighter_image, 0.8, on_region)
+                        if fighter_pos != None: pyautogui.dragTo(fighter_pos, duration=0.8)
+                        elif on_bomber:
+                            bomber_pos = check_image(bomber_image, 0.8, on_region)
+                            if bomber_pos != None: pyautogui.dragTo(bomber_pos, duration=0.8)
+                            elif on_head:
+                                enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
+                                if enemy_headquarters_pos != None: pyautogui.dragTo(enemy_headquarters_pos, duration=0.9)
+                                else:
+                                    pyautogui.dragTo((pyautogui.size()[0]//2+ random.choice([-1, 1])*51, pyautogui.size()[1]//2),duration=0.5)
 
 def play_round2(): #用于移动支援线
     global game_round
@@ -660,8 +631,8 @@ def check_abnormal():
 
     #check_frontline_status() #顺便,检查一下前线情况
 
-    if check_image(mission_failed_image, 0.6, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
-    if check_image(mission_passed_image, 0.6, all_screen) != None: print(formatted_time + "本局胜利")
+    #if check_image(mission_failed_image, 0.6, all_screen) != None: print(formatted_time +"检测到本局失败, 记录一下")
+    #if check_image(mission_passed_image, 0.6, all_screen) != None: print(formatted_time + "本局胜利")
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
         print(formatted_time + "异常检测程序发现 [对手] 字样")
         abnormal_state = True
@@ -692,7 +663,7 @@ def reset_game_stage():
     round_start_time = time.time()
     round_total_start_time = time.time()
 
-def check_image(image_name, confidence_level, detect_region=all_screen, step_opt=0.05, grayscale_opt=False):  # 图像查找包装程序
+def check_image(image_name, confidence_level, detect_region=all_screen, step_opt=0.05, grayscale_opt=False, failcount = 3):  # 图像查找包装程序
     global return_img_pos
     i = 1.0
     failsafe_counter = 0
@@ -702,8 +673,8 @@ def check_image(image_name, confidence_level, detect_region=all_screen, step_opt
         #return_img_pos = None
         return_img_pos = None
         failsafe_counter += 1
-        if failsafe_counter > 3:
-            rint(formatted_time + f'查找{image_name}超过次数限制')
+        if failsafe_counter > failcount:
+            #print(formatted_time + f'查找 {image_name} 超过次数限制')
             return None
         try:
             return_img_pos = pyautogui.locateCenterOnScreen(image_name, confidence=i, region=detect_region, grayscale=grayscale_opt)
@@ -712,13 +683,12 @@ def check_image(image_name, confidence_level, detect_region=all_screen, step_opt
             i = i - step_opt
             return_img_pos = None
             #return None
-
         if return_img_pos != None:
-            print(formatted_time + f'找到  {image_name} -> confi= {i:.2f}')
+            print(formatted_time + f'找到 {image_name} -> confi level= {i:.2f}')
             return return_img_pos
         elif i <= confidence_level:
             return_img_pos = None
-            #print(formatted_time + f'查找{image_name}尝试了所有精度，可能没找到')
+            #print(formatted_time + f'查找 {image_name} 尝试了所有精度')
             return None
 
 def mouse_return_home():
@@ -801,7 +771,7 @@ def main():
     game_active = False
     round_total_start_time = time.time()
     reset_game_stage()
-    print(" -- KARDs 1939 Better AFK, Ver 250801e by Eason -- ")
+    print(" -- KARDs 1939 Better AFK, Ver 250802a by Eason -- ")
     debug_testing()
     setup_logging()
     while True:
@@ -837,6 +807,18 @@ def ocr_check_stamina(): #Check Stamina by using OCR
             ocr_stamina = 0
     return ocr_stamina
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
+def calculate_orange_ratio(image_path):
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"无法读取图像: {image_path}")
+    hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_orange = np.array([10, 100, 100])
+    upper_orange = np.array([25, 255, 255])
+    orange_mask = cv2.inRange(hsv_image, lower_orange, upper_orange)
+    orange_pixels = cv2.countNonZero(orange_mask)
+    total_pixels = image.shape[0] * image.shape[1]
+    orange_ratio = (orange_pixels / total_pixels) * 100
+    return orange_ratio, orange_mask
 
 def debug_testing():
     global formatted_time
@@ -846,34 +828,8 @@ def debug_testing():
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
 
-        #drop_card_to_anyzone(750, 99, on_head=True ,on_region=enemy_second_row)
-        """
-        source_img = cv2.imread('2ocr.png', cv2.IMREAD_GRAYSCALE)
-        target_img = cv2.imread(kmark_image, cv2.IMREAD_GRAYSCALE)
-        target_height, target_width = target_img.shape[:2]
-        result = cv2.matchTemplate(source_img, target_img, cv2.TM_CCOEFF_NORMED)
-        threshold = 0.9
-        locations = np.where(result >= threshold)
-        print('1:')
-        print(locations)
-        # 提取匹配位置
-        matches = []
-        for pt in zip(*locations[::-1]):
-            matches.append((pt[0], pt[1], target_width, target_height))
-
-        if matches != None:
-            print('2:')
-            print(matches[0])
-            x1 = int(matches[0][0]) - 30
-            y1 = int(matches[0][1]) + 7
-            crop_region = (x1, y1 ,x1 + 33, y1 + 49)
-            print(crop_region)
-            crop_image('1ocr.png', 'ocr_cardcost.png', *crop_region)
-            ocrresult = ocrscanner.readtext('ocr_cardcost.png', ['ru', 'en'], mag_ratio=1, detail=0, allowlist='0123456789')
-            joined_ocrresult = ''.join(ocrresult)
-            print('3:')
-            print(joined_ocrresult)
-        """
+        print('cost:')
+        print(ocr_check_card_cost())
 
 # ---------------- Debug Section End --------------------
         print("Forever Loop")
