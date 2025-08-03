@@ -437,13 +437,14 @@ def play_round1(): #用于抽牌
 
             if any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                 print(formatted_time + "移动兵力")
-                if any(word for word in ['零战', '第二挺进', '第9', '仙台'] if word in joined_ocrresult):
+                if any(word for word in ['零战', '二挺进', '第9', '仙台'] if word in joined_ocrresult):
                     print(formatted_time + "需要二次拖放兵力, 专属处理")
                     pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                     pyautogui.dragTo((x, pyautogui.size()[1]*73//100), duration=1)  # 按照一定的顺序把牌丢出去
                     time.sleep(1)
                     pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-                    move_to_anyzone(on_region=upper_row)
+                    if '二挺进' in joined_ocrresult: move_to_anyzone(on_guard=False,on_head=False, on_Tank=False, on_region=upper_row)
+                    else: move_to_anyzone(on_region=upper_row)
                     pyautogui.click()
                     pyautogui.click()
                 else:
