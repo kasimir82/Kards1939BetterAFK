@@ -497,7 +497,6 @@ def play_cards():
         play_round3()
         play_round1()
         play_round4()
-        play_round4()
 
 def play_round1(): #用于抽牌
     global mouse_yaxis_coeff
