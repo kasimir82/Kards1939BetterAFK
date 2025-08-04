@@ -1,6 +1,6 @@
 import pyautogui, time, datetime, pygetwindow as gw, random, sys, easyocr, keyboard
 from datetime import datetime
-import cv2, numpy as np, os
+import re, cv2, numpy as np, os
 
 pyautogui.FAILSAFE = False
 # 安装命令：
@@ -61,9 +61,12 @@ ninegong_zone3 = (pyautogui.size()[0]*2//3, 0, pyautogui.size()[0]//3, pyautogui
 zero_tili_region = (0, pyautogui.size()[1]*790//1080, pyautogui.size()[0]*200//1920, (1080 - 790)) #0体力区域
 pass_button_region = (pyautogui.size()[0]*1607//1920,pyautogui.size()[1]*622//1080, 270, 130) #空过按钮区域
 
-upper_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*135//1080, 1120, 240) #敌方支援图标区域
-middle_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*401//1080, 1120, 240) #前线图标区域
-lower_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*672//1080, 1120 , 240) #支援战线图标区域
+upper_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*135//1080, 1120, 240) #敌方支援区域
+middle_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*401//1080, 1120, 240) #前线区域
+lower_row = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*672//1080, 1120 , 240) #支援战线区域
+upper_row_typeiconzone = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*303//1080, 1120, 70) #敌方支援图标区域
+middle_row_typeiconzone = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*564//1080, 1120, 70) #前线图标区域
+lower_row_typeiconzone = (pyautogui.size()[0]*419//1920, pyautogui.size()[1]*839//1080, 1120 , 70) #支援战线图标区域
 
 enemy_zone = [upper_row, lower_row]
 enemy_guard_zone = (pyautogui.size()[0]*431//1920, pyautogui.size()[1]*129//1080, 1075, 161) #敌方支援状态区域
@@ -186,11 +189,11 @@ def click_start_game_button():
         error_handling(clicked_start_game_button, "点击右下开始按钮", 0.8, False, right_onethird_screen)
     if check_image(renji_img, 0.7, lower_half_screen) != None :
         error_handling(renji_img, "找到超时人机选项，点击", 0.8, True, lower_half_screen)
-        mouse_return_home()
+        mouse_return_right()
     if check_image(confirm_button_image, 0.7, lower_half_screen) != None :
         error_handling(confirm_button_image, "点击了选牌以后的确认键", 0.7, True, lower_half_screen)
         front_line_upper_base = 0
-        mouse_return_home()
+        mouse_return_right()
         round_total_start_time = time.time()
     if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
         print(formatted_time+"[然然]触发了重新登陆，退出")
@@ -277,7 +280,7 @@ def check_frontline_status():
     global front_line_upper_base
     global front_line_lower_base
 
-    mouse_return_home() #避开遮挡
+    mouse_return_right() #避开遮挡
     time.sleep(0.2)
 
     ocrimage = pyautogui.screenshot('OCR/ocr_frontline1.png', region=front_line_upper_region)
@@ -304,9 +307,6 @@ def check_frontline_status():
     print(formatted_time+f"上方前线黑色度: {gray_mean_upper: .2f} ,下方前线黑色度: {gray_mean_lower: .2f} ,前线状态: " + frontline_status[front_line_status])
     return
 
-
-
-
 def check_image(image_name, confidence_level, detect_region=all_screen, step_opt=0.05, grayscale_opt=False, failcount = 3):  # 图像查找包装程序
     global return_img_pos
     i = 1.0
@@ -332,13 +332,13 @@ def check_image(image_name, confidence_level, detect_region=all_screen, step_opt
             send_back[0] = int(return_img_pos[0])
             send_back[1] = int(return_img_pos[1])
             print(formatted_time + f'找到 {image_name} -> confi level= {i:.2f}')
-            if image_name == enemy_headquarters_image: send_back[1] -= 20
+            if image_name == enemy_headquarters_image: send_back[1] -= 30
             if image_name == guard_image:
                 send_back[0] -= 60
                 send_back[1] += 30
             if image_name in [infantry_image, tank_image, fighter_image, bomber_image, mortar_image]:
                 #print('buchang unit')
-                send_back[1] -= 40
+                send_back[1] -= 70
             return_img_pos = send_back
             return send_back
         elif i <= confidence_level:
@@ -388,90 +388,99 @@ def gameround_timeout_bug_reset():  # 有时候20s倒计时失效，此时单手
         print(formatted_time + "卡死太久，自爆结束")
     return
 
-
-
 def move_drag_to_any_target(target_type = '1234567', target_zone='1', drag_is_True = True):
     drag_is_True = not drag_is_True
     for ystr in target_zone:
         x = int(ystr)
         if x == 1: on_region = upper_row
         elif x == 2: on_region = middle_row
-        elif x == 3: on_region = lower_row
+        else: on_region = lower_row
 
+        if x == 3:
+            bak_mouse_pos = pyautogui.position()
+            if pyautogui.position()[0] < pyautogui.size()[0]//2: mouse_return_left()
+            else: mouse_return_right()
+
+        drag_speed = random.uniform(0.9, 1.3)
         for digit_char in target_type:
             digit = int(digit_char)
             match digit:
                 case 1:
                     guard_pos = check_image(guard_image, 0.8, on_region)
                     if guard_pos != None:
-                        #print('da guard')
-                        if drag_is_True: pyautogui.moveTo((guard_pos[0],guard_pos[1]), duration=0.6)
-                        else: pyautogui.dragTo((guard_pos[0],guard_pos[1]), duration=0.6)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo((guard_pos[0],guard_pos[1]), duration=drag_speed)
+                        else: pyautogui.dragTo((guard_pos[0],guard_pos[1]), duration=drag_speed)
                         return
                 case 2:
-                    enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, enemy_hq_zone)
-                    if enemy_headquarters_pos != None and on_region == upper_row:
-                        #print('da hq')
-                        if drag_is_True: pyautogui.moveTo(enemy_headquarters_pos, duration=0.8)
-                        else: pyautogui.dragTo(enemy_headquarters_pos, duration=0.8)
-                        return
+                    if on_region == upper_row:
+                        enemy_headquarters_pos = check_image(enemy_headquarters_image, 0.8, on_region)
+                        if enemy_headquarters_pos != None:
+                            if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                            if drag_is_True: pyautogui.moveTo(enemy_headquarters_pos, duration=drag_speed*1.5)
+                            else: pyautogui.dragTo(enemy_headquarters_pos, duration=drag_speed*1.5)
+                            return
                 case 3:
                     fighter_pos = check_image(fighter_image, 0.8, on_region)
                     if fighter_pos != None:
-                        #print('da fighter')
-                        if drag_is_True: pyautogui.moveTo(fighter_pos, duration=0.8)
-                        else: pyautogui.dragTo(fighter_pos, duration=0.8)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo(fighter_pos, duration=drag_speed*1.5)
+                        else: pyautogui.dragTo(fighter_pos, duration=drag_speed*1.5)
                         return
                 case 4:
                     bomber_pos = check_image(bomber_image, 0.8, on_region)
                     if bomber_pos != None:
-                        #print('da bomber')
-                        if drag_is_True: pyautogui.moveTo(bomber_pos, duration=0.8)
-                        else: pyautogui.dragTo(bomber_pos, duration=0.8)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo(bomber_pos, duration=drag_speed*1.5)
+                        else: pyautogui.dragTo(bomber_pos, duration=drag_speed*1.5)
                         return
                 case 5:
                     mortar_pos = check_image(mortar_image, 0.8, on_region)
                     if mortar_pos != None:
-                        #print('da motar')
-                        if drag_is_True: pyautogui.moveTo(mortar_pos, duration=0.7)
-                        else: pyautogui.dragTo(mortar_pos, duration=0.7)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo(mortar_pos, duration=drag_speed)
+                        else: pyautogui.dragTo(mortar_pos, duration=drag_speed)
                         return
                 case 6:
                     infantry_pos = check_image(infantry_image, 0.8, on_region)
                     if infantry_pos != None:
-                        #print('da infantry')
-                        if drag_is_True: pyautogui.moveTo(infantry_pos, duration=0.4)
-                        else: pyautogui.dragTo(infantry_pos, duration=0.4)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo(infantry_pos, duration=drag_speed)
+                        else: pyautogui.dragTo(infantry_pos, duration=drag_speed)
                         return
                 case 7:
                     tank_pos = check_image(tank_image, 0.8, on_region)
                     if tank_pos != None:
-                        #print('da tank')
-                        if drag_is_True: pyautogui.moveTo(tank_pos, duration=0.4)
-                        else: pyautogui.dragTo(tank_pos, duration=0.4)
+                        if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                        if drag_is_True: pyautogui.moveTo(tank_pos, duration=drag_speed)
+                        else: pyautogui.dragTo(tank_pos, duration=drag_speed)
                         return
                 case 8: # Support line units go forward
-                    pyautogui.dragTo((pyautogui.size()[0] // 2 + random.choice([-1, 1]) * random.uniform(54, 57), pyautogui.size()[1]*45//100),
-                                     duration=random.uniform(0.5, 0.9))
+                    if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
+                    pyautogui.dragTo((pyautogui.size()[0] // 2 + random.choice([-1, 1]) * random.uniform(44, 50), \
+                                      pyautogui.size()[1]*45//100), duration=drag_speed)
                     return
                 case 9: # Deal the card
+                    if x == 3: pyautogui.moveTo(bak_mouse_pos,duration=0.5)
                     pyautogui.dragTo((mouse_x, pyautogui.size()[1]*72//100), duration=0.4)
                     return
     return
 
-def mouse_return_home():
-    pyautogui.moveTo(1400 + random.uniform(-50, 50), 1000 + random.uniform(-30, 0), duration=random.uniform(0.4, 0.6))  # 移动鼠标不遮挡屏幕
+def mouse_return_right():
+    pyautogui.moveTo(1427 + random.uniform(-10, 10), 1000 + random.uniform(-30, 0),duration=0.5)  # 移动鼠标不遮挡屏幕
+
+def mouse_return_left():
+    pyautogui.moveTo(496 + random.uniform(-10, 10), 1000 + random.uniform(-30, 0),duration=0.5)  # 移动鼠标不遮挡屏幕
 
 def round_unit_operation(unit_position, unit_type, round_number=2):
     if check_abnormal():
         print(formatted_time + "阶段2 unit 操作发现异常， 退出")
         return
     pyautogui.moveTo(unit_position[0], unit_position[1], duration=0.4)
+    #time.sleep(0.5)
     #pyautogui.move(random.randint(-5, 5), random.randint(-5, 5))
     #pyautogui.click()
-    pyautogui.mouseUp(duration=0.4)
-    pyautogui.mouseDown(duration=0.4)
-    pyautogui.mouseUp(duration=0.4)
+    time.sleep(0.1)
 
     match unit_type:
         case 'fighter':
@@ -490,7 +499,7 @@ def round_unit_operation(unit_position, unit_type, round_number=2):
                 move_drag_to_any_target('1345678', '2') #8 means drag to front line
                 print(formatted_time + "round2 op -> 指挥tank or 步兵攻击middle 1345678")
             elif round_number == 3:
-                move_drag_to_any_target('125', '1')
+                move_drag_to_any_target('1234567', '1')
                 print(formatted_time + "round3 op -> 指挥tank or 步兵攻击upper 125")
     time.sleep(1)  # 过动画
 
@@ -503,31 +512,34 @@ def click_pass_button():
         print(formatted_time+"找到我方回合按钮，开始打牌")
 
         reset_game_stage()
-        #time.sleep(random.uniform(1, 2))# 等待过完讨厌的动画
+        time.sleep(1)# 等待过完讨厌的动画
         ocr_check_gameround()
-
-        for i in range(2): #打牌主流程
-            play_round2_3()
-            if round_finished: break
-            play_round2_3()
-            if round_finished: break
+        # 出牌处理
+        if ocr_gameround == 0:
             play_round1()
-            if round_finished: break
-            play_round2_3()
-            if round_finished: break
+            play_round4()
+        elif ocr_gameround <= 1:
+            play_round1()
+            play_round2()
+            play_round4()
+        else:
+            play_round2()
+            play_round3()
+            play_round1()
+            play_round4()
 
         #打完了
         pyautogui.moveTo(pass_button_pos[0]+ random.uniform(-150, -120), pass_button_pos[1]+ random.uniform(0, 50), duration=random.uniform(0.4, 0.7))
         pyautogui.moveTo(pass_button_pos, duration=random.uniform(0.2, 0.5))
         if check_abnormal(check_orange_passbutton=False):
-            mouse_return_home()
+            mouse_return_right()
             return
         pyautogui.click(pass_button_pos)
         pyautogui.click(pass_button_pos)
         print(formatted_time+"点击了空过按钮")
 #--------------- After Clicking Pass Button ----------------
         send_message()
-        mouse_return_home()
+        mouse_return_right()
         ocr_check_gameround()
         check_frontline_status()
 
@@ -537,9 +549,6 @@ def play_round1(): #用于抽牌
     global mouse_x
     print(formatted_time +"第1轮出牌，抽最下面的牌") #阶段1，抽牌
     #time.sleep(1)  # 等待过完抽卡动画
-    if check_abnormal():
-        print(formatted_time + "第1轮出牌检查到异常, 退出")
-        return
     check_frontline_status()  # 顺便,检查一下前线情况
 
     for i in range(7):
@@ -568,12 +577,32 @@ def play_round1(): #用于抽牌
             joined_ocrresult = ''.join(ocrresult)
             print(joined_ocrresult)
             # ------------- OCR ---------------
-            mouse_return_home()
 
             # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
-            pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.5)
-            pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
-            print(formatted_time + "特殊指令处理")
+            pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.7)
+
+            print(formatted_time + "正则表达式匹配 处理部分开始")
+
+            if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '单位') != None or \
+                    find_ordered_keywords(joined_ocrresult, '指令', '单位', '伤害') != None:
+                move_drag_to_any_target('134567', '21')
+
+            if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '总部') != None or \
+                    find_ordered_keywords(joined_ocrresult, '指令', '敌方', '总部') != None:
+                move_drag_to_any_target('2', '1')
+
+            if find_ordered_keywords(joined_ocrresult, '指令', '友方', '单位', '获得') != None:
+                move_drag_to_any_target('34567', '32')
+
+            if find_ordered_keywords(joined_ocrresult, '指令', '抽', '单位') != None:
+                move_drag_to_any_target('9')
+
+            # ----------------------- 正则处理完成
+
+            pyautogui.mouseDown()
+            pyautogui.move(0, -40)
+
+            print(formatted_time + "特殊指令处理部分开始")
             if '扩张若' in joined_ocrresult:
                 print(formatted_time + "发现 _扩张_ 卡牌")
                 if front_line_status == 1:
@@ -606,14 +635,16 @@ def play_round1(): #用于抽牌
                 # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower
                 move_drag_to_any_target('36754', '1')
                 print(formatted_time + "两栖迸攻, 直接消灭对方一个攻击小于3单位")
+# ----------------------- 特殊处理完成
 
-            movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机', '猎兵营']  # 某些介绍太长的单位也在列表里
+            movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机']  # 某些介绍太长的单位也在列表里
             if any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                 print(formatted_time + "移动兵力")
                 if any(word for word in ['零战', '二挺进', '第9突击队', '仙台'] if word in joined_ocrresult):
                     print(formatted_time + "需要二次拖放兵力, 专属处理")
                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 9出牌 / 1upper 2middle 3lower
                     move_drag_to_any_target('9')
+                    time.sleep(0.5)
                     if '二挺进' in joined_ocrresult:
                         print(formatted_time + "_二挺进_卡处理")
                         # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
@@ -629,15 +660,140 @@ def play_round1(): #用于抽牌
                     pyautogui.mouseUp()
                     pyautogui.click(clicks=2, interval=0.2)
                 else:
-                    # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 9chupai/ 1upper 2middle 3lower/ Tmove Fdrag
-                    move_drag_to_any_target('9')
-
-            time.sleep(2)  # 卡牌发出, 等待过完动画
-            mouse_return_home()
+                    # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 9出牌 / 1upper 2middle 3lower/ Tmove Fdrag
+                    move_drag_to_any_target('9') #普通兵直接出兵
+#--------------------------- 出兵处理完成
+            print(formatted_time + "一次出牌完成")
+            if pyautogui.position()[0] < pyautogui.size()[0]//2: mouse_return_left()
+            else: mouse_return_right()
+            time.sleep(1)  # 卡牌发出, 等待过完动画
         else:
-            print(formatted_time + f"当前手牌消耗{current_card_cost}高于体力{ocr_stamina},中断")
+            pass
+            #print(formatted_time + f"当前手牌灰色,中断")
 
-def play_round2_3():
+def play_round2(): #用于移动支援线
+    #time.sleep(1)  # 等待过完动画
+    check_frontline_status()  # 顺便,检查一下前线情况
+    print(formatted_time +"第2轮出牌，支援线前进") #阶段2，引导坦克步兵向前线前进
+    print(formatted_time + "战斗机处理流程")
+    try:
+        posfighterBox = pyautogui.locateAllOnScreen(fighter_image, confidence=0.8, region=lower_row_typeiconzone)
+        posfighterBoxFilterd = filter_boxes(posfighterBox, 10)
+        for posfighter in posfighterBoxFilterd:
+            if check_abnormal():
+                print('333333')
+                return
+            pyautogui.moveTo(posfighter[0]+15, posfighter[1]-65, duration=0.7)
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('1327', '1')
+            time.sleep(1)  # 过动画
+            mouse_return_right()
+            print(formatted_time + "指挥战斗机攻击1327")
+    except Exception as e:
+        print(formatted_time + "战斗机处理出错 可能是没找到")
+
+    print(formatted_time + "轰炸机处理流程")
+    try:
+        posBomberBox = pyautogui.locateAllOnScreen(bomber_image, confidence=0.8, region=lower_row_typeiconzone)
+        posBomberBoxFilterd = filter_boxes(posBomberBox, 10)
+        for posBomber in posBomberBoxFilterd:
+            if check_abnormal():
+                print('2222')
+                return
+            pyautogui.moveTo(posBomber[0]+15, posBomber[1]-65, duration=0.7)
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('124567', '1')
+            #time.sleep(1)  # 过动画
+            mouse_return_right()
+            print(formatted_time + "指挥轰炸机攻击12")
+    except Exception as e:
+        print(formatted_time + "轰炸机处理出错 可能是没找到")
+
+    print(formatted_time+"炮炮处理")
+    try:
+        posMortarBox = pyautogui.locateAllOnScreen(mortar_image, confidence=0.8, region=lower_row_typeiconzone)
+        posMortarBoxFilterd = filter_boxes(posMortarBox, 10)
+        for posMortar in posMortarBoxFilterd:
+            if check_abnormal():
+                return
+            pyautogui.moveTo(posMortar[0]+15, posMortar[1]-65, duration=0.7)
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('12567', '1')
+            #time.sleep(1)  # 过动画
+            mouse_return_right()
+            print(formatted_time + "指挥炮兵攻击12")
+    except Exception as e:
+        print(formatted_time +"炮兵处理出错，可能是没找到")
+
+    try:
+        posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.8, region=lower_row_typeiconzone)
+        posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
+        for posInfantry in posInfantryBoxFilterd:
+            if check_abnormal():
+                print(formatted_time + "阶段2a体力0或者发现异常， 退出")
+                return
+            pyautogui.moveTo(posInfantry[0]+15, posInfantry[1]-65)
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('1345678', '2')
+            #time.sleep(1)  # 过动画
+            mouse_return_right()
+    except Exception as e:
+        print(formatted_time +"阶段2查找Infantry异常，可能目标已移动")
+
+    try:
+        posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.8, region=lower_row_typeiconzone)
+        posTankBoxFilterd = filter_boxes(posTankBox, 10)
+        for posTank in posTankBoxFilterd:
+            if check_abnormal():
+                print(formatted_time + "阶段2b体力0或者发现异常， 退出")
+                return
+            pyautogui.moveTo(posTank[0]+15, posTank[1]-65)
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('1345678', '2')
+            #time.sleep(1)  # 过动画
+            mouse_return_right()
+    except Exception as e:
+        print(formatted_time +"阶段2查找Tank异常，可能没有目标")
+
+def play_round3(): #用于前线
+    global enemy_headquarters_pos
+    global front_line_status
+
+    check_frontline_status()  # 顺便,检查一下前线情况
+    if front_line_status != 2:  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
+        #time.sleep(1)  # 等待过完动画
+        print(formatted_time +"第3轮出牌，前线动作")
+        try:
+            posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.8, region=middle_row_typeiconzone)
+            posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
+            for posInfantry in posInfantryBoxFilterd:
+                if check_abnormal():
+                    print(formatted_time + "阶段3a体力0或者发现异常， 退出")
+                    return
+                pyautogui.moveTo(posInfantry[0]+15, posInfantry[1]-65)
+                # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+                move_drag_to_any_target('125', '1')
+                #time.sleep(1)  # 过动画
+                mouse_return_right()
+        except Exception as e:
+            print(formatted_time +"阶段3查找Infantry异常，可能目标已移动")
+
+        try:
+            posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.8, region=middle_row_typeiconzone)
+            posTankBoxFilterd = filter_boxes(posTankBox, 10)
+            for posTank in posTankBoxFilterd:
+                if check_abnormal():
+                    print(formatted_time + "阶段3b体力0或者发现异常， 退出")
+                    return
+                pyautogui.moveTo(posTank[0]+15, posTank[1]-65)
+                # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+                move_drag_to_any_target('125', '1')
+                #time.sleep(1)  # 过动画
+                mouse_return_right()
+        except Exception as e:
+            print(formatted_time +"阶段3查找Tank异常，可能目标已移动")
+
+def play_round4():
     global front_line_status
     card_location_lower_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
     card_location_lower_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
@@ -654,17 +810,15 @@ def play_round2_3():
     check_frontline_status()
 
     print(formatted_time + "第4轮出牌，检查遗漏")
-    infantry_count = count_unit_number(infantry_image, lower_row)
-    tank_count = count_unit_number(tank_image, lower_row)
-    fighter_count = count_unit_number(fighter_image, lower_row)
-    bomber_count = count_unit_number(bomber_image, lower_row)
-    mortar_count = count_unit_number(mortar_image, lower_row)
+    infantry_count = count_unit_number(infantry_image, lower_row_typeiconzone)
+    tank_count = count_unit_number(tank_image, lower_row_typeiconzone)
+    fighter_count = count_unit_number(fighter_image, lower_row_typeiconzone)
+    bomber_count = count_unit_number(bomber_image, lower_row_typeiconzone)
+    mortar_count = count_unit_number(mortar_image, lower_row_typeiconzone)
     unit_secondrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
     print(f'\nCount lower row: inf{infantry_count}, tank{tank_count}, plane{fighter_count}, bom{bomber_count}, mortar{mortar_count}')
 
     match unit_secondrow:
-        case 0: pass
-
         case 1:
             for i in range(1, 3):
                 if is_target_pattern(card_location_lower_even[i]):
@@ -696,19 +850,18 @@ def play_round2_3():
     check_frontline_status()
 
     if front_line_status == 1:  # 0代表未知 1代表被我占领 2代表敌方占领 3代表中立
-        infantry_count = count_unit_number(infantry_image, middle_row)
-        tank_count = count_unit_number(tank_image, middle_row)
-        fighter_count = count_unit_number(fighter_image, middle_row)
-        bomber_count = count_unit_number(bomber_image, middle_row)
-        mortar_count = count_unit_number(mortar_image, middle_row)
-        unit_thirdrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
+        infantry_count = count_unit_number(infantry_image, middle_row_typeiconzone)
+        tank_count = count_unit_number(tank_image, middle_row_typeiconzone)
+        #fighter_count = count_unit_number(fighter_image, middle_row_typeiconzone)
+        #bomber_count = count_unit_number(bomber_image, middle_row_typeiconzone)
+        #mortar_count = count_unit_number(mortar_image, middle_row_typeiconzone)
+        unit_thirdrow = infantry_count + tank_count # + fighter_count + bomber_count + mortar_count
         print(
-            f'Count mid row: inf{infantry_count}, tank{tank_count}, plane{fighter_count}, bom{bomber_count}, mortar{mortar_count}')
+            f'Count mid row: inf{infantry_count}, tank{tank_count}') #, plane{fighter_count}, bom{bomber_count}, mortar{mortar_count}')
 
-        if unit_thirdrow > 0:
-            if check_abnormal():
-                print(formatted_time + "第4轮出牌检查到异常, 退出")
-                return
+        if check_abnormal():
+            print(formatted_time + "第4轮出牌检查到异常, 退出")
+            return
 
         match unit_thirdrow:
             case 0: return
@@ -959,6 +1112,37 @@ def is_target_pattern(region,  # 待检测区域 (x, y, width, height)
     print(f"墨绿要{bg_threshold:.1%}占比：{dark_green_ratio:.1%},橙色要{min_orange_pixels} 像素数：{orange_count}p, 真? {return_value}")
     return return_value
 
+
+def find_ordered_keywords(text, kw1="", kw2="", kw3="", kw4="", kw5=""):
+    """
+    检查文本中是否按顺序包含最多五个关键词（支持空字符串作为忽略条件）
+
+    参数:
+        text: 要检查的文本
+        kw1~kw5: 五个关键词，空字符串表示忽略该关键词
+
+    返回:
+        匹配到的内容（字符串），如果未匹配则返回None
+    """
+    # 收集非空关键词
+    keywords = [kw for kw in [kw1, kw2, kw3, kw4, kw5] if kw]
+
+    # 如果没有提供有效关键词，返回None
+    if not keywords:
+        return None
+
+    # 对每个关键词进行转义处理（避免特殊字符影响正则）
+    escaped_kw = [re.escape(kw) for kw in keywords]
+
+    # 构建正则表达式模式：关键词之间可以有任意字符
+    pattern = r'.*?'.join(escaped_kw)
+    # 整个匹配前后可以有任意字符
+    pattern = f'.*?{pattern}.*?'
+
+    # 执行匹配
+    match = re.search(pattern, text, re.DOTALL)  # re.DOTALL让.匹配包括换行符在内的所有字符
+    return match.group() if match else None
+
 def play_ground():
     global formatted_time
     global return_img_pos
@@ -968,8 +1152,8 @@ def play_ground():
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
 
-        play_round2_3()
-
+        posMortarBox = pyautogui.locateAllOnScreen(mortar_image, confidence=0.8, region=lower_row_typeiconzone)
+        print(list(posMortarBox))
 # ---------------- Debug Section End ----------------------
         print("Forever Loop")
         while True: sys.exit(0)
