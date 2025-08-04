@@ -663,10 +663,10 @@ def play_round3(): #用于前线
 def play_recheck_all_unit():
     global front_line_status
     time.sleep(1)
-    card_location_2_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
-    card_location_2_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
-    card_location_3_odd = [(456, 417, 24, 28), (666, 417, 24, 28), (885, 417, 24, 28), (1098, 417, 24, 28), (1311, 417, 24, 28)]
-    card_location_3_even = [(558, 417, 24, 28), (776, 417, 24, 28), (990, 417, 24, 28), (1208, 417, 24, 28)]
+    card_location_lower_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
+    card_location_lower_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
+    card_location_middle_odd = [(456, 417, 24, 28), (666, 417, 24, 28), (885, 417, 24, 28), (1098, 417, 24, 28), (1311, 417, 24, 28)]
+    card_location_middle_even = [(558, 417, 24, 28), (776, 417, 24, 28), (990, 417, 24, 28), (1208, 417, 24, 28)]
 
     unit_secondrow = 0
     unit_thirdrow = 0
@@ -688,44 +688,45 @@ def play_recheck_all_unit():
     bomber_count = count_unit_number(bomber_image, lower_row)
     mortar_count = count_unit_number(mortar_image, lower_row)
     unit_secondrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
-    print(f'Count lower row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
+    print(f'\nCount lower row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
 
-    grey_threshold = 0
-    orange_secondrow = 0;
-    unit_secondrow += 1
+    unit_secondrow += 1 #add hq as one
     match unit_secondrow:
         case 1:
-            pyautogui.screenshot('OCR/ocr_unit_icon.png', region=card_location_2_odd[2])
-            ratio, mask = calculate_orange_ratio('OCR/ocr_unit_icon.png')
-            orange_secondrow += ratio
+            i = 2
+            if is_target_pattern(card_location_middle_odd[i]):
+                unit_type = check_unit_type(
+                    (card_location_middle_odd[i][0], card_location_middle_odd[i][1], 114, 213));
+                round_unit_operation((card_location_middle_odd[i][0] + 80, card_location_middle_odd[i][1] + 100),
+                                     unit_type=unit_type, round_number=2)
         case 2:
-            for i in range(1, 3): # 3不包含在内
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_even[i])
-                ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                orange_secondrow += ratio
+            for i in range(1, 3):
+                if is_target_pattern(card_location_middle_even[i]):
+                    unit_type = check_unit_type(
+                        (card_location_middle_even[i][0], card_location_middle_even[i][1], 114, 213));
+                    round_unit_operation((card_location_middle_even[i][0] + 80, card_location_middle_even[i][1] + 100),
+                                         unit_type=unit_type, round_number=2)
         case 3:
-            for i in range(1, 4): # 4不包含在内
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_odd[i])
-                ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                orange_secondrow += ratio
+            for i in range(1, 4):
+                if is_target_pattern(card_location_middle_odd[i]):
+                    unit_type = check_unit_type(
+                        (card_location_middle_odd[i][0], card_location_middle_odd[i][1], 114, 213));
+                    round_unit_operation((card_location_middle_odd[i][0] + 80, card_location_middle_odd[i][1] + 100),
+                                         unit_type=unit_type, round_number=2)
         case 4:
             for i in range(0, 4):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_even[i])
-                ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                orange_secondrow += ratio
+                if is_target_pattern(card_location_middle_even[i]):
+                    unit_type = check_unit_type(
+                        (card_location_middle_even[i][0], card_location_middle_even[i][1], 114, 213));
+                    round_unit_operation((card_location_middle_even[i][0] + 80, card_location_middle_even[i][1] + 100),
+                                         unit_type=unit_type, round_number=2)
         case 5:
             for i in range(0, 5):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_odd[i])
-                ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                orange_secondrow += ratio
-        case _:
-            orange_secondrow = 0
-
-    print(formatted_time +f"第二排成员 {unit_secondrow}名, 橙色合计: {orange_secondrow}")
-    if orange_secondrow >10:
-        print(formatted_time + "发现橙色, 重打round2")
-        #time.sleep(0.5)
-        #play_round2()
+                if is_target_pattern(card_location_middle_odd[i]):
+                    unit_type = check_unit_type(
+                        (card_location_middle_odd[i][0], card_location_middle_odd[i][1], 114, 213));
+                    round_unit_operation((card_location_middle_odd[i][0] + 80, card_location_middle_odd[i][1] + 100),
+                                         unit_type=unit_type, round_number=2)
 
     if front_line_status == 1:  # 0代表未知 1代表被我占领 2代表敌方占领 3代表中立
         infantry_count = count_unit_number(infantry_image, middle_row)
@@ -734,42 +735,44 @@ def play_recheck_all_unit():
         bomber_count = count_unit_number(bomber_image, middle_row)
         mortar_count = count_unit_number(mortar_image, middle_row)
         unit_thirdrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
-        print(f'Count middle row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
+        print(f'\nCount middle row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
 
-        orange_thirdrow = 0;
         match unit_thirdrow:
             case 1:
-                pyautogui.screenshot('OCR/ocr_unit_icon.png', region=card_location_3_odd[2])
-                ratio, mask = calculate_orange_ratio('OCR/ocr_unit_icon.png')
-                orange_thirdrow += ratio
+                i = 2
+                if is_target_pattern(card_location_middle_odd[i]):
+                    unit_type = check_unit_type(
+                        (card_location_middle_odd[i][0], card_location_middle_odd[i][1], 114, 213));
+                    round_unit_operation((card_location_middle_odd[i][0] + 80, card_location_middle_odd[i][1] + 100),
+                                         unit_type=unit_type, round_number=3)
             case 2:
                 for i in range(1, 3):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_even[i])
-                    ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                    orange_thirdrow += ratio
+                    if is_target_pattern(card_location_middle_even[i]):
+                        unit_type = check_unit_type((card_location_middle_even[i][0], card_location_middle_even[i][1], 114, 213));
+                        round_unit_operation((card_location_middle_even[i][0] + 80, card_location_middle_even[i][1] + 100), unit_type=unit_type, round_number=3)
             case 3:
                 for i in range(1, 4):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_odd[i])
-                    ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                    orange_thirdrow += ratio
+                    if is_target_pattern(card_location_middle_odd[i]):
+                        unit_type = check_unit_type((card_location_middle_odd[i][0], card_location_middle_odd[i][1],114,213));
+                        round_unit_operation((card_location_middle_odd[i][0]+80,card_location_middle_odd[i][1]+100), unit_type=unit_type, round_number=3)
             case 4:
                 for i in range(0, 4):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_even[i])
-                    ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                    orange_thirdrow += ratio
+                    if is_target_pattern(card_location_middle_even[i]):
+                        unit_type = check_unit_type((card_location_middle_even[i][0], card_location_middle_even[i][1], 114, 213));
+                        round_unit_operation((card_location_middle_even[i][0] + 80, card_location_middle_even[i][1] + 100), unit_type=unit_type, round_number=3)
             case 5:
                 for i in range(0, 5):
-                    is_target_pattern(card_location_3_odd[i])
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_odd[i])
-                    ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
-                    orange_thirdrow += ratio
-            case _:
-                orange_thirdrow = 0
-        print(formatted_time + f"第三排成员 {unit_thirdrow}名, 橙色合计: {orange_thirdrow}")
-        if orange_thirdrow > 10:
-            #time.sleep(2)
-            print(formatted_time + "发现橙色, 重打round3")
-            #play_round3()
+                    if is_target_pattern(card_location_middle_odd[i]):
+                        unit_type = check_unit_type((card_location_middle_odd[i][0], card_location_middle_odd[i][1],114,213));
+                        round_unit_operation((card_location_middle_odd[i][0]+80,card_location_middle_odd[i][1]+100), unit_type=unit_type, round_number=3)
+
+def check_unit_type(check_region):
+    if check_image(infantry_image, 0.8, detect_region=check_region): return 'infantry'
+    if check_image(tank_image, 0.8, detect_region=check_region): return 'tank'
+    if check_image(fighter_image, 0.8, detect_region=check_region): return 'fighter'
+    if check_image(bomber_image, 0.8, detect_region=check_region): return 'bomber'
+    if check_image(mortar_image, 0.8, detect_region=check_region): return 'mortar'
+    return None
 
 def try_restart():
     error_handling(start_scale125_img, "找到重新开始DPI 125%，点击") #启动器按钮写的太shit
@@ -800,11 +803,6 @@ def calculate_black_ratio(image_path):
     black_ratio, black_mask = calculate_color_ratio(image_path, np.array([0, 0, 0]), np.array([180, 255, 40]))
     #print(f'Black: {black_ratio:.2f}')
     return black_ratio, black_mask
-
-def calculate_grey_ratio(image_path):
-    grey_ratio, grey_mask = calculate_color_ratio(image_path, np.array([20, 10, 30]), np.array([50, 40, 70]))
-    print(f'Grey: {grey_ratio:.2f}')
-    return grey_ratio, grey_mask
 
 def calculate_color_ratio(image_path, lower_threshold, upper_threshold):
     image = cv2.imread(image_path)
@@ -953,53 +951,39 @@ def main():
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
 
 def is_target_pattern(region,  # 待检测区域 (x, y, width, height)
-                      dark_green_range=((0, 80, 30), (50, 150, 80)),  # 深墨绿色RGB范围
-                      orange_range=((200, 100, 0), (255, 200, 50)),  # 橙色RGB范围
-                      bg_threshold=0.5,
-                      min_orange_pixels=40
+                      # 调整墨绿色范围（基于69,68,58，允许±10的波动）
+                      dark_green_range=((40, 40, 30), (79, 78, 68)),
+                      # 调整橙色范围（基于224,177,80，允许±15的波动）
+                      orange_range=((200, 140, 50), (239, 192, 95)),
+                      bg_threshold=0.30,  # 适当降低阈值，应对可能的边缘轻微变色
+                      min_orange_pixels=20,  # 数字可能较小，减少最小像素要求
                       ):
     """
     检测指定屏幕区域是否符合：深墨绿色底色 + 橙色数字
     返回：符合条件则返回True，否则False
     """
     print("\n" + "=" * 50)
-    print(f"开始检测区域：{region}")
-    print(f"深墨绿色范围：{dark_green_range}")
-    print(f"橙色范围：{orange_range}")
-    print(f"底色阈值：{bg_threshold}，最小橙色像素：{min_orange_pixels}")
+    #print(f"开始检测区域：{region}")
     # 1. 截取目标区域图像
     screenshot = pyautogui.screenshot(region=region)
-    # 转换为RGB模式（避免alpha通道干扰）
     img = screenshot.convert('RGB')
-    # 转换为numpy数组便于处理 (height, width, 3)
     pixels = np.array(img)
-
-    # 2. 统计深墨绿色像素数量（底色）
-    # 拆分解码RGB范围（低阈值和高阈值）
     dg_low, dg_high = dark_green_range
-    # 判断每个像素是否在深墨绿色范围内
     is_dark_green = (pixels[:, :, 0] >= dg_low[0]) & (pixels[:, :, 0] <= dg_high[0]) & (pixels[:, :, 1] >= dg_low[1]) & (pixels[:, :, 1] <= dg_high[1]) & (pixels[:, :, 2] >= dg_low[2]) & (pixels[:, :, 2] <= dg_high[2])
     dark_green_count = np.sum(is_dark_green)
     total_pixels = pixels.shape[0] * pixels.shape[1]
+    dark_green_ratio = dark_green_count / total_pixels
 
-    print(f"深墨绿色像素数：{dark_green_count}")
+    print(f"深墨绿色像素数：{dark_green_count}，占比：{dark_green_ratio:.2%}")
 
-    # 检查底色占比是否达标
-    if dark_green_count / total_pixels < bg_threshold:
-        return False
-
-    # 3. 检测是否存在足够的橙色像素（数字）
     o_low, o_high = orange_range
     is_orange = (pixels[:, :, 0] >= o_low[0]) & (pixels[:, :, 0] <= o_high[0]) & (pixels[:, :, 1] >= o_low[1]) & (pixels[:, :, 1] <= o_high[1]) & (pixels[:, :, 2] >= o_low[2]) & (pixels[:, :, 2] <= o_high[2])  # B通道
     orange_count = np.sum(is_orange)
     # 检查橙色像素数量是否达标
     print(f"橙色像素数：{orange_count}，最低要求：{min_orange_pixels}")
-
-    if orange_count < min_orange_pixels:
-        return False
-
-    # 4. 所有条件满足
-    return True
+    if dark_green_ratio > bg_threshold and orange_count > min_orange_pixels:
+        return True
+    else: return False
 
 def play_ground():
     global formatted_time
@@ -1019,3 +1003,6 @@ def play_ground():
 
 if __name__ == "__main__":
     main()
+
+    #69,68,58
+    #224,177,80
