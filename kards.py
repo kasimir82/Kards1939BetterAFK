@@ -1,10 +1,10 @@
-import pyautogui, time, datetime, pygetwindow as gw, random, sys, easyocr
+import pyautogui, time, datetime, pygetwindow as gw, random, sys, easyocr, keyboard
 from datetime import datetime
 import cv2, numpy as np, os
 
 pyautogui.FAILSAFE = False
 # 安装命令：
-# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2
+# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2 keyboard
 
 #图片定义 Image Definations
 confirm_button_image = "Resource/confirm.png" #选派确认按钮
@@ -119,6 +119,14 @@ def setup_logging(log_filename="run_log.txt"):
     handle_old_log(log_filename)
     sys.stdout = LogRedirector(log_filename)
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def on_f9_press():
+    """F9键按下时的处理函数"""
+    print(formatted_time + "检测到F9中断按下, 程序中断退出")
+    sys.exit(0)  # 退出程序
+
+# 注册F9键的按下事件
+keyboard.add_hotkey('f9', on_f9_press)
 
 class Box:
     def __init__(self, left, top, width, height):
@@ -590,56 +598,60 @@ def play_round1(): #用于抽牌
         else:
             print(formatted_time + f"当前手牌消耗{current_card_cost}高于体力{ocr_stamina},中断")
 
+def round2_unit_operation(unit_position, unit_type):
+    if check_abnormal():
+        print(formatted_time + "阶段2 unit 操作发现异常， 退出")
+        return
+    pyautogui.moveTo(unit_position[0], unit_position[1], duration=0.6)
+    pyautogui.click(unit_position[0], unit_position[1])
+    match unit_type:
+        case 'fighter':
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('1327', '1')
+            print(formatted_time + "round2 op -> 指挥战斗机攻击upper 1327")
+        case 'bomber':
+            move_drag_to_any_target('124567', '1')
+            print(formatted_time + "round2 op -> 指挥轰炸机攻击upper 12")
+        case 'mortar':
+            move_drag_to_any_target('12567', '1')
+            print(formatted_time + "round2 op -> 指挥炮兵攻击upper 12")
+        case 'infantry' | 'tank':
+            move_drag_to_any_target('1345678', '2')
+            print(formatted_time + "round2 op -> 指挥tank or 步兵攻击middle 1345678")
+    time.sleep(1)  # 过动画
 
 def play_round2(): #用于移动支援线
     #time.sleep(1)  # 等待过完动画
     check_frontline_status()  # 顺便,检查一下前线情况
     print(formatted_time +"第2轮出牌，支援线前进") #阶段2，引导坦克步兵向前线前进
+
     print(formatted_time + "战斗机处理流程")
     try:
         posfighterBox = pyautogui.locateAllOnScreen(fighter_image, confidence=0.8, region=lower_row)
         posfighterBoxFilterd = filter_boxes(posfighterBox, 10)
         for posfighter in posfighterBoxFilterd:
-            if check_abnormal(): return
-            pyautogui.moveTo(posfighter[0]+15, posfighter[1]-65, duration=0.7)
-            pyautogui.click(posfighter[0]+15, posfighter[1]-65)
-            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-            move_drag_to_any_target('1327', '1')
-            time.sleep(1)  # 过动画
+            round2_unit_operation((posfighter[0]+15, posfighter[1]-65), unit_type='fighter')
             mouse_return_home()
-            print(formatted_time + "指挥战斗机攻击1327")
     except Exception as e:
-        print(formatted_time + "战斗机处理出错 可能是没找到")
+        print(formatted_time + "战斗机批量处理出错 可能是没找到")
 
     print(formatted_time + "轰炸机处理流程")
     try:
         posBomberBox = pyautogui.locateAllOnScreen(bomber_image, confidence=0.8, region=lower_row)
         posBomberBoxFilterd = filter_boxes(posBomberBox, 10)
         for posBomber in posBomberBoxFilterd:
-            if check_abnormal(): return
-            pyautogui.moveTo(posBomber[0]+15, posBomber[1]-65, duration=0.7)
-            pyautogui.click(posBomber[0]+15, posBomber[1]-65)
-            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-            move_drag_to_any_target('124567', '1')
-            #time.sleep(1)  # 过动画
+            round2_unit_operation(posBomber[0]+15, posBomber[1]-65, unit_type='bomber')
             mouse_return_home()
-            print(formatted_time + "指挥轰炸机攻击12")
     except Exception as e:
-        print(formatted_time + "轰炸机处理出错 可能是没找到")
+        print(formatted_time + "轰炸机批量处理出错 可能是没找到")
 
     print(formatted_time+"炮炮处理")
     try:
         posMortarBox = pyautogui.locateAllOnScreen(mortar_image, confidence=0.8, region=lower_row)
         posMortarBoxFilterd = filter_boxes(posMortarBox, 10)
         for posMortar in posMortarBoxFilterd:
-            if check_abnormal(): return
-            pyautogui.moveTo(posMortar[0]+15, posMortar[1]-65, duration=0.7)
-            pyautogui.click(posMortar[0]+15, posMortar[1]-65)
-            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-            move_drag_to_any_target('12567', '1')
-            #time.sleep(1)  # 过动画
+            round2_unit_operation(posMortar[0]+15, posMortar[1]-65, unit_type='mortar')
             mouse_return_home()
-            print(formatted_time + "指挥炮兵攻击12")
     except Exception as e:
         print(formatted_time +"炮兵处理出错，可能是没找到")
 
@@ -647,33 +659,32 @@ def play_round2(): #用于移动支援线
         posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.8, region=lower_row)
         posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
         for posInfantry in posInfantryBoxFilterd:
-            if check_abnormal():
-                print(formatted_time + "阶段2a体力0或者发现异常， 退出")
-                return
-            pyautogui.moveTo(posInfantry[0]+15, posInfantry[1]-65)
-            pyautogui.click(posInfantry[0]+15, posInfantry[1]-65)
-            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-            move_drag_to_any_target('1345678', '2')
-            #time.sleep(1)  # 过动画
+            round2_unit_operation(posInfantry[0]+15, posInfantry[1]-65, unit_type='infantry')
             mouse_return_home()
     except Exception as e:
-        print(formatted_time +"阶段2查找Infantry异常，可能目标已移动")
+        print(formatted_time +"阶段2查找Infantry异常，可能是没找到")
 
     try:
         posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.8, region=lower_row)
         posTankBoxFilterd = filter_boxes(posTankBox, 10)
         for posTank in posTankBoxFilterd:
-            if check_abnormal():
-                print(formatted_time + "阶段2b体力0或者发现异常， 退出")
-                return
-            pyautogui.moveTo(posTank[0]+15, posTank[1]-65)
-            pyautogui.click(posTank[0]+15, posTank[1]-65)
-            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-            move_drag_to_any_target('1345678', '2')
-            #time.sleep(1)  # 过动画
+            round2_unit_operation(posTank[0]+15, posTank[1]-65, unit_type='tank')
             mouse_return_home()
     except Exception as e:
-        print(formatted_time +"阶段2查找Tank异常，可能没有目标")
+        print(formatted_time +"阶段2查找Tank异常，可能是没找到")
+
+def round3_unit_operation(unit_position, unit_type):
+    if check_abnormal():
+        print(formatted_time + "阶段3 unit 操作发现异常， 退出")
+        return
+    pyautogui.moveTo(unit_position[0], unit_position[1], duration=0.6)
+    pyautogui.click(unit_position[0], unit_position[1])
+    match unit_type:
+        case 'infantry' | 'tank':
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
+            move_drag_to_any_target('125', '1')
+            print(formatted_time + "round3 op -> 指挥tank or 步兵攻击upper 125")
+    time.sleep(1)  # 过动画
 
 def play_round3(): #用于前线
     global enemy_headquarters_pos
@@ -687,14 +698,7 @@ def play_round3(): #用于前线
             posInfantryBox = pyautogui.locateAllOnScreen(infantry_image, confidence=0.8, region=middle_row)
             posInfantryBoxFilterd = filter_boxes(posInfantryBox, 10)
             for posInfantry in posInfantryBoxFilterd:
-                if check_abnormal():
-                    print(formatted_time + "阶段3a体力0或者发现异常， 退出")
-                    return
-                pyautogui.moveTo(posInfantry[0]+15, posInfantry[1]-65)
-                pyautogui.click(posInfantry[0]+15, posInfantry[1]-65)
-                # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                move_drag_to_any_target('125', '1')
-                #time.sleep(1)  # 过动画
+                round3_unit_operation(posInfantry[0]+15, posInfantry[1]-65, unit_type='infantry')
                 mouse_return_home()
         except Exception as e:
             print(formatted_time +"阶段3查找Infantry异常，可能目标已移动")
@@ -703,26 +707,18 @@ def play_round3(): #用于前线
             posTankBox = pyautogui.locateAllOnScreen(tank_image, confidence=0.8, region=middle_row)
             posTankBoxFilterd = filter_boxes(posTankBox, 10)
             for posTank in posTankBoxFilterd:
-                if check_abnormal():
-                    print(formatted_time + "阶段3b体力0或者发现异常， 退出")
-                    return
-                pyautogui.moveTo(posTank[0]+15, posTank[1]-65)
-                pyautogui.click(posTank[0]+15, posTank[1]-65)
-                # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                move_drag_to_any_target('125', '1')
-                #time.sleep(1)  # 过动画
+                round3_unit_operation(posTank[0]+15, posTank[1]-65, unit_type='tank')
                 mouse_return_home()
         except Exception as e:
             print(formatted_time +"阶段3查找Tank异常，可能目标已移动")
 
-
 def play_round4():
     global front_line_status
     time.sleep(1)
-    location_2_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
-    location_2_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
-    location_3_odd = [(456, 417, 24, 28), (666, 417, 24, 28), (885, 417, 24, 28), (1098, 417, 24, 28), (1311, 417, 24, 28)]
-    location_3_even = [(558, 417, 24, 28), (776, 417, 24, 28), (990, 417, 24, 28), (1208, 417, 24, 28)]
+    card_location_2_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
+    card_location_2_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
+    card_location_3_odd = [(456, 417, 24, 28), (666, 417, 24, 28), (885, 417, 24, 28), (1098, 417, 24, 28), (1311, 417, 24, 28)]
+    card_location_3_even = [(558, 417, 24, 28), (776, 417, 24, 28), (990, 417, 24, 28), (1208, 417, 24, 28)]
 
     unit_secondrow = 0
     unit_thirdrow = 0
@@ -753,27 +749,27 @@ def play_round4():
     unit_secondrow += 1
     match unit_secondrow:
         case 1:
-            pyautogui.screenshot('OCR/ocr_unit_icon.png', region=location_2_odd[2])
+            pyautogui.screenshot('OCR/ocr_unit_icon.png', region=card_location_2_odd[2])
             ratio, mask = calculate_orange_ratio('OCR/ocr_unit_icon.png')
             orange_secondrow += ratio
         case 2:
             for i in range(1, 3):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_2_even[i])
+                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_even[i])
                 ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                 orange_secondrow += ratio
         case 3:
             for i in range(1, 4):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_2_odd[i])
+                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_odd[i])
                 ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                 orange_secondrow += ratio
         case 4:
             for i in range(0, 4):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_2_even[i])
+                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_even[i])
                 ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                 orange_secondrow += ratio
         case 5:
             for i in range(0, 5):
-                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_2_odd[i])
+                screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_2_odd[i])
                 ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                 orange_secondrow += ratio
         case _:
@@ -801,27 +797,27 @@ def play_round4():
         orange_thirdrow = 0;
         match unit_thirdrow:
             case 1:
-                pyautogui.screenshot('OCR/ocr_unit_icon.png', region=location_3_odd[2])
+                pyautogui.screenshot('OCR/ocr_unit_icon.png', region=card_location_3_odd[2])
                 ratio, mask = calculate_orange_ratio('OCR/ocr_unit_icon.png')
                 orange_thirdrow += ratio
             case 2:
                 for i in range(1, 3):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_3_even[i])
+                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_even[i])
                     ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                     orange_thirdrow += ratio
             case 3:
                 for i in range(1, 4):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_3_odd[i])
+                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_odd[i])
                     ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                     orange_thirdrow += ratio
             case 4:
                 for i in range(0, 4):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_3_even[i])
+                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_even[i])
                     ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                     orange_thirdrow += ratio
             case 5:
                 for i in range(0, 5):
-                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=location_3_odd[i])
+                    screenshot = pyautogui.screenshot(f'OCR/ocr_unit_icon{i:d}.png', region=card_location_3_odd[i])
                     ratio, mask = calculate_orange_ratio(f'OCR/ocr_unit_icon{i:d}.png')
                     orange_thirdrow += ratio
             case _:
@@ -991,6 +987,7 @@ def main():
     print(" -- KARDs 1939 Better AFK, Ver 250803f by Eason -- ")
     debug_testing()
     setup_logging()
+
     while True:
         now = datetime.now()
         formatted_time = now.strftime('%m-%d %H:%M:%S -- ')
@@ -1007,11 +1004,17 @@ def main():
             try_restart()
             reset_game_stage()
             print(formatted_time + "未找到游戏窗口")
+            if keyboard.is_pressed('f9'):
+                print(formatted_time + "检测到F9查询按下, 程序中断退出")
+                sys.exit(0)
 
         if game_active:
-            click_start_game_button()
-            click_pass_button()
-
+            try:
+                click_start_game_button()
+                click_pass_button()
+            except KeyboardInterrupt:
+                print(formatted_time + "检测到F9按下, 程序中断退出")
+                sys.exit(0)
 
 
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
