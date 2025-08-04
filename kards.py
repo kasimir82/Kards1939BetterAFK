@@ -192,6 +192,11 @@ def click_start_game_button():
         front_line_upper_base = 0
         mouse_return_home()
         round_total_start_time = time.time()
+    if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
+        print(formatted_time+"[然然]触发了重新登陆，退出")
+        if game_window != None: game_window.minimize()
+        round_finished = True
+        sys.exit(0)
 
     check_mission_passfail()
 
@@ -219,34 +224,7 @@ def click_start_game_button():
         #logger.close()
         sys.exit(0)
 
-def click_pass_button():
-    global round_start_time
-    global round_finished
-    
-    if check_image(pass_turn_button_image, 0.8, right_onethird_screen) != None or check_image(end_turn_button_image, 0.7, right_onethird_screen) != None:
-        pass_button_pos = return_img_pos
-        print(formatted_time+"找到我方回合按钮，开始打牌")
-        round_finished = False
-        round_start_time = time.time()
-        time.sleep(random.uniform(1, 2))# 等待过完讨厌的动画
-        ocr_check_gameround()
 
-        play_cards()
-
-        pyautogui.moveTo(pass_button_pos[0]+ random.uniform(-150, -120), pass_button_pos[1]+ random.uniform(0, 50), duration=random.uniform(0.4, 0.7))
-        pyautogui.moveTo(pass_button_pos, duration=random.uniform(0.2, 0.5))
-        if check_abnormal(check_orange_passbutton=False):
-            mouse_return_home()
-            return
-        pyautogui.click(pass_button_pos)
-        pyautogui.click(pass_button_pos)
-        print(formatted_time+"点击了空过按钮")
-#--------------- After Clicking Pass Button ----------------
-        send_message()
-        mouse_return_home()
-        ocr_check_gameround()
-        check_frontline_status()
-#--------------- After Clicking Pass Button ----------------
 
 def count_unit_number(unit_image, unit_region = lower_row):
     counter = 0
@@ -269,9 +247,11 @@ def check_abnormal(check_orange_passbutton = True):
 
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
         print(formatted_time + "异常检测程序发现 [对手] 字样")
+        round_finished = True
         return True
     if check_image(continue_button_image, 0.8, lower_half_screen) != None: #找到继续字样
         print(formatted_time + "异常检测程序发现 [继续] 字样")
+        round_finished = True
         return True
     if check_orange_pass_button() and check_orange_passbutton:
         print(formatted_time + "找到了橙色的结束按钮")
@@ -285,13 +265,9 @@ def check_abnormal(check_orange_passbutton = True):
     #ocr_check_gameround()
     # -------------- OCR ----------------
     """
-    if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
-        print(formatted_time+"[然然]触发了重新登陆，退出")
-        if game_window != None: game_window.minimize()
-        sys.exit(0)
-
     if keyboard.is_pressed('f9'):
         print(formatted_time + "检测到F9查询按下, 程序中断退出")
+        round_finished = True
         sys.exit(0)
     return abnormal_state
 
@@ -491,9 +467,12 @@ def round_unit_operation(unit_position, unit_type, round_number=2):
         print(formatted_time + "阶段2 unit 操作发现异常， 退出")
         return
     pyautogui.moveTo(unit_position[0], unit_position[1], duration=0.4)
-    pyautogui.move(random.randint(-5, 5), random.randint(-5, 5))
-    pyautogui.click()
-    #pyautogui.mouseDown()
+    #pyautogui.move(random.randint(-5, 5), random.randint(-5, 5))
+    #pyautogui.click()
+    pyautogui.mouseUp(duration=0.4)
+    pyautogui.mouseDown(duration=0.4)
+    pyautogui.mouseUp(duration=0.4)
+
     match unit_type:
         case 'fighter':
             # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
@@ -515,25 +494,42 @@ def round_unit_operation(unit_position, unit_type, round_number=2):
                 print(formatted_time + "round3 op -> 指挥tank or 步兵攻击upper 125")
     time.sleep(1)  # 过动画
 
-def play_cards():
-    global enemy_headquarters_pos
+def click_pass_button():
+    global round_start_time
+    global round_finished
 
-    ocr_check_gameround()
-    #出牌处理
-    if ocr_gameround <= 1:
-        play_round1()
-        play_recheck_all_unit()
-    #elif ocr_gameround <= 1:
-    #    play_round1()
-    #    play_round2()
-    #    play_recheck_all_unit()
-    else:
-        play_recheck_all_unit()
-        play_recheck_all_unit()
-        play_recheck_all_unit()
-        play_round1()
-        play_recheck_all_unit()
-        play_recheck_all_unit()
+    if check_image(pass_turn_button_image, 0.8, right_onethird_screen) != None or check_image(end_turn_button_image, 0.7, right_onethird_screen) != None:
+        pass_button_pos = return_img_pos
+        print(formatted_time+"找到我方回合按钮，开始打牌")
+
+        reset_game_stage()
+        #time.sleep(random.uniform(1, 2))# 等待过完讨厌的动画
+        ocr_check_gameround()
+
+        for i in range(2): #打牌主流程
+            play_round2_3()
+            if round_finished: break
+            play_round2_3()
+            if round_finished: break
+            play_round1()
+            if round_finished: break
+            play_round2_3()
+            if round_finished: break
+
+        #打完了
+        pyautogui.moveTo(pass_button_pos[0]+ random.uniform(-150, -120), pass_button_pos[1]+ random.uniform(0, 50), duration=random.uniform(0.4, 0.7))
+        pyautogui.moveTo(pass_button_pos, duration=random.uniform(0.2, 0.5))
+        if check_abnormal(check_orange_passbutton=False):
+            mouse_return_home()
+            return
+        pyautogui.click(pass_button_pos)
+        pyautogui.click(pass_button_pos)
+        print(formatted_time+"点击了空过按钮")
+#--------------- After Clicking Pass Button ----------------
+        send_message()
+        mouse_return_home()
+        ocr_check_gameround()
+        check_frontline_status()
 
 def play_round1(): #用于抽牌
     global mouse_yaxis_coeff
@@ -541,13 +537,16 @@ def play_round1(): #用于抽牌
     global mouse_x
     print(formatted_time +"第1轮出牌，抽最下面的牌") #阶段1，抽牌
     #time.sleep(1)  # 等待过完抽卡动画
-    check_frontline_status()  # 顺便,检查一下前线情况
-    if round_finished:
-        print(formatted_time + "R1 检测到本局结束 返回")  # 阶段1，抽牌
+    if check_abnormal():
+        print(formatted_time + "第1轮出牌检查到异常, 退出")
         return
+    check_frontline_status()  # 顺便,检查一下前线情况
 
     for i in range(7):
-        if check_abnormal(): return
+        if check_abnormal():
+            print(formatted_time + "第4轮出牌检查到异常, 退出")
+            return
+
         x = 600 + i * random.randint(89, 99)
         mouse_x = x
 
@@ -622,6 +621,9 @@ def play_round1(): #用于抽牌
                     elif '仙台' in joined_ocrresult:
                         print(formatted_time + "_仙台联队_卡处理")
                         move_drag_to_any_target('135476', '12')
+                    elif '第9突击队' in joined_ocrresult:
+                        print(formatted_time + "_第9突击队_卡处理")
+                        move_drag_to_any_target('135476', '12')
                     else:
                         move_drag_to_any_target('1234567', '12')
                     pyautogui.mouseUp()
@@ -635,66 +637,20 @@ def play_round1(): #用于抽牌
         else:
             print(formatted_time + f"当前手牌消耗{current_card_cost}高于体力{ocr_stamina},中断")
 
-"""
-def play_round2(): #用于移动支援线
-    #time.sleep(1)  # 等待过完动画
-    check_frontline_status()  # 顺便,检查一下前线情况
-
-    for unit_name in ['fighter', 'bomber', 'mortar', 'infantry', 'tank']:
-        print(formatted_time + f"Round 2 -> {unit_name}处理流程")
-        dynamic_image = globals()[f"{unit_name}_image"]
-        try:
-            posUnitBox = pyautogui.locateAllOnScreen(dynamic_image, confidence=0.8, region=lower_row)
-            posUnitBoxFilterd = filter_boxes(posUnitBox, 10)
-            for posUnit in posUnitBoxFilterd:
-                round_unit_operation((posUnit[0]+15, posUnit[1]-65), unit_type=unit_name, round_number=2)
-                mouse_return_home()
-        except Exception as e:
-            if check_abnormal():
-                print(formatted_time + "阶段2 unit 操作发现异常， 退出")
-                return
-            print(formatted_time + f"Round 2 -> {unit_name} 处理出错 可能是没找到")
-
-def play_round3(): #用于前线
-    global enemy_headquarters_pos
+def play_round2_3():
     global front_line_status
-
-    check_frontline_status()  # 顺便,检查一下前线情况
-    if front_line_status != 2:  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
-        for unit_name in ['infantry', 'tank']:
-            print(formatted_time + f"Round 3 -> {unit_name}处理流程")
-            dynamic_image = globals()[f"{unit_name}_image"]
-            try:
-                posUnitBox = pyautogui.locateAllOnScreen(dynamic_image, confidence=0.8, region=middle_row)
-                posUnitBoxFilterd = filter_boxes(posUnitBox, 10)
-                for posUnit in posUnitBoxFilterd:
-                    round_unit_operation((posUnit[0]+15, posUnit[1]-65), unit_type=unit_name, round_number=3)
-                    mouse_return_home()
-            except Exception as e:
-                if check_abnormal():
-                    print(formatted_time + "阶段3 unit 操作发现异常， 退出")
-                    return
-                print(formatted_time + f"Round 3 --> {unit_name} 处理出错 可能是没找到")
-"""
-def play_recheck_all_unit():
-    global front_line_status
-
-    if round_finished:
-        print(formatted_time + "R1 检测到本局结束 返回")  # 阶段1，抽牌
-        return
-
-    time.sleep(1)
     card_location_lower_odd = [(456, 686, 24, 28), (666, 686, 24, 28), (881, 686, 24, 28), (1098, 686, 24, 28), (1311, 686, 24, 28)]
     card_location_lower_even = [(558, 686, 24, 28), (776, 686, 24, 28), (990, 686, 24, 28), (1208, 686, 24, 28)]
     card_location_middle_odd = [(456, 417, 24, 28), (666, 417, 24, 28), (885, 417, 24, 28), (1098, 417, 24, 28), (1311, 417, 24, 28)]
     card_location_middle_even = [(558, 417, 24, 28), (776, 417, 24, 28), (990, 417, 24, 28), (1208, 417, 24, 28)]
-
     unit_secondrow = 0
     unit_thirdrow = 0
+
     if check_abnormal():
         print(formatted_time + "第4轮出牌检查到异常, 退出")
         return
 
+    time.sleep(1)
     check_frontline_status()
 
     print(formatted_time + "第4轮出牌，检查遗漏")
@@ -704,7 +660,7 @@ def play_recheck_all_unit():
     bomber_count = count_unit_number(bomber_image, lower_row)
     mortar_count = count_unit_number(mortar_image, lower_row)
     unit_secondrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
-    print(f'\nCount lower row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
+    print(f'\nCount lower row: inf{infantry_count}, tank{tank_count}, plane{fighter_count}, bom{bomber_count}, mortar{mortar_count}')
 
     match unit_secondrow:
         case 0: pass
@@ -737,7 +693,6 @@ def play_recheck_all_unit():
                         (card_location_lower_odd[i][0], card_location_lower_odd[i][1], 114, 213));
                     round_unit_operation((card_location_lower_odd[i][0] + 80, card_location_lower_odd[i][1] + 100),
                                          unit_type=unit_type, round_number=2)
-
     check_frontline_status()
 
     if front_line_status == 1:  # 0代表未知 1代表被我占领 2代表敌方占领 3代表中立
@@ -747,7 +702,8 @@ def play_recheck_all_unit():
         bomber_count = count_unit_number(bomber_image, middle_row)
         mortar_count = count_unit_number(mortar_image, middle_row)
         unit_thirdrow = infantry_count + tank_count + fighter_count + bomber_count + mortar_count
-        print(f'\nCount middle row: {infantry_count}, {tank_count}, {fighter_count}, {bomber_count}, {mortar_count}')
+        print(
+            f'Count mid row: inf{infantry_count}, tank{tank_count}, plane{fighter_count}, bom{bomber_count}, mortar{mortar_count}')
 
         if unit_thirdrow > 0:
             if check_abnormal():
@@ -756,7 +712,6 @@ def play_recheck_all_unit():
 
         match unit_thirdrow:
             case 0: return
-
             case 1:
                 i = 2
                 if is_target_pattern(card_location_middle_odd[i]):
@@ -901,6 +856,8 @@ def reset_game_stage():
     global ocr_gameround
     global round_start_time
     global round_total_start_time
+    global round_finished
+    round_finished = False
     game_stage = 0
     ocr_gameround = 0
     round_start_time = time.time()
@@ -913,7 +870,7 @@ def send_message(msg_id = 0):
         time.sleep(0.5)
     #if True:
         if check_image(msg_img, 0.9, right_onethird_screen) != None :
-            random_msg_number = random.choice([3,5,6])
+            random_msg_number = random.choice([3,5])
             pyautogui.moveTo(return_img_pos, duration=0.5)
             time.sleep(0.5)
             pyautogui.click(return_img_pos)
@@ -973,7 +930,7 @@ def is_target_pattern(region,  # 待检测区域 (x, y, width, height)
                       dark_green_range=((40, 40, 30), (79, 78, 68)),
                       # 调整橙色范围（基于224,177,80，允许±15的波动）
                       orange_range=((200, 140, 50), (239, 192, 95)),
-                      bg_threshold=0.30,  # 适当降低阈值，应对可能的边缘轻微变色
+                      bg_threshold=0.24,  # 适当降低阈值，应对可能的边缘轻微变色
                       min_orange_pixels=20,  # 数字可能较小，减少最小像素要求
                       ):
     """
@@ -1011,7 +968,7 @@ def play_ground():
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
 
-        play_recheck_all_unit()
+        play_round2_3()
 
 # ---------------- Debug Section End ----------------------
         print("Forever Loop")
