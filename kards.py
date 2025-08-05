@@ -85,8 +85,6 @@ failsafe_counter = 0
 ocr_stamina = 0
 front_line_status = 3  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
 front_line_diff_threshold = 9
-front_line_upper_base = 0
-front_line_lower_base = 0
 game_stage = 0
 ocr_stamina = 0
 mouse_x = 0
@@ -137,25 +135,23 @@ class Box:
         return f"Box(left={self.left}, top={self.top}, width={self.width}, height={self.height})"
 
 def click_start_game_button():
-    global game_stage
+    global enter_game_seq
     global round_start_time #本手起始时间
     global logger
     global round_total_time #本局总时间
     global round_total_start_time #本局起始时间
     global failsafe_counter
     global game_window
-    global front_line_upper_base
-    global front_line_lower_base
     global round_single_time
 
     round_single_time = time.time() - round_start_time
     round_total_time = time.time() - round_total_start_time
-    print(formatted_time+f"开始跑流程:{game_stage},轮次:{ocr_gameround},本轮耗时{round_single_time:.0f}秒，本局耗时{round_total_time:.0f}秒,前线状态:" + frontline_status[front_line_status]) #game_stage保证了进入对局的点击顺序
+    print(formatted_time+f"开始跑流程:{enter_game_seq},轮次:{ocr_gameround},本轮耗时{round_single_time:.0f}秒，本局耗时{round_total_time:.0f}秒,前线状态:" + frontline_status[front_line_status]) #enter_game_seq保证了进入对局的点击顺序
     
     if round_single_time > 60 * 3:   #游戏倒计时超时以后bug处理
         gameround_timeout_bug_reset()
         
-    if game_stage == 0 : #查找左上角游戏图标和点击开始按钮
+    if enter_game_seq == 0 : #查找左上角游戏图标和点击开始按钮
         if check_image(main_menu_start_button_image, 0.9, left_onethird_screen) != None or check_image(main_menu_button_image, 0.9, left_onethird_screen) != None:
             pyautogui.moveTo(pyautogui.size()[0] // 2+ random.uniform(-200, 200), pyautogui.size()[1] // 2+ random.uniform(-200, 200), duration=0.7)
             pyautogui.moveTo(return_img_pos, duration=random.uniform(0.2, 0.5))
@@ -165,30 +161,30 @@ def click_start_game_button():
             time.sleep(0.2)
             failsafe_counter = 0
             if check_image(exp_image, 0.7, all_screen, grayscale_opt=True) != None:
-                game_stage = 1
+                enter_game_seq = 1
             print(formatted_time+"点击主屏幕开始按钮")
-    if game_stage == 1 : #点击包含‘经验’二字的卡组
+    if enter_game_seq == 1 : #点击包含‘经验’二字的卡组
         failsafe_counter += 1
         if failsafe_counter >= 10:
-            game_stage = 0
+            enter_game_seq = 0
             return
         if check_image(exp_image, 0.7, all_screen, grayscale_opt=True) != None:
             pyautogui.moveTo(return_img_pos, duration=random.uniform(0.2, 0.5))
             pyautogui.click(return_img_pos)
             failsafe_counter = 0
-            game_stage = 2
-    if game_stage == 2 : #点击右侧的休闲模式，避免进入排位模式
+            enter_game_seq = 2
+    if enter_game_seq == 2 : #点击右侧的休闲模式，避免进入排位模式
         failsafe_counter += 1
         if failsafe_counter >= 10:
-            game_stage = 0
+            enter_game_seq = 0
             return
         if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen):
             failsafe_counter = 0
-            game_stage = 3
-    if game_stage == 3 : #点击右侧开始
+            enter_game_seq = 3
+    if enter_game_seq == 3 : #点击右侧开始
         failsafe_counter += 1
         if failsafe_counter >= 10:
-            game_stage = 0
+            enter_game_seq = 0
             return
         error_handling(clicked_start_game_button, "点击右下开始按钮", 0.8, False, right_onethird_screen)
     if check_image(renji_img, 0.7, lower_half_screen) != None :
@@ -196,13 +192,12 @@ def click_start_game_button():
         mouse_return_right()
     if check_image(confirm_button_image, 0.7, lower_half_screen) != None :
         error_handling(confirm_button_image, "点击了选牌以后的确认键", 0.7, True, lower_half_screen)
-        front_line_upper_base = 0
         mouse_return_right()
+        round_start_time = time.time()
         round_total_start_time = time.time()
     if check_image(reconnect_img, 0.9) != None :    #Check if 被别的设备踢出去了
         print(formatted_time+"[然然]触发了重新登陆，退出")
         if game_window != None: game_window.minimize()
-        round_finished = True
         sys.exit(0)
 
     check_mission_passfail()
@@ -250,11 +245,11 @@ def check_abnormal(check_orange_passbutton = True):
     global ocr_stamina
     global round_finished
 
-    if round_finished: return True
+    if round_finished and check_orange_passbutton: return True
     #check_frontline_status() #顺便,检查一下前线情况
-    if check_mission_passfail():
-        round_finished = True
-        return True
+    #if check_mission_passfail():
+    #    round_finished = True
+    #    return True
 
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
         print(formatted_time + "异常检测程序发现 [对手] 字样")
@@ -285,8 +280,6 @@ def check_abnormal(check_orange_passbutton = True):
 def check_frontline_status():
     global front_line_status
     global front_line_diff_threshold
-    global front_line_upper_base
-    global front_line_lower_base
 
     mouse_return_right() #避开遮挡
     time.sleep(0.2)
@@ -380,7 +373,7 @@ def calculate_orange_ratio(image_path):
     return orange_ratio, orange_mask
 
 def calculate_black_ratio(image_path):
-    black_ratio, black_mask = calculate_color_ratio(image_path, np.array([0, 0, 0]), np.array([180, 255, 40]))
+    black_ratio, black_mask = calculate_color_ratio(image_path, np.array([0, 0, 10]), np.array([180, 255, 60]))
     #print(f'Black: {black_ratio:.2f}')
     return black_ratio, black_mask
 
@@ -394,7 +387,6 @@ def calculate_color_ratio(image_path, lower_threshold, upper_threshold):
     total_pixels = image.shape[0] * image.shape[1]
     color_ratio = (color_pixels / total_pixels) * 100
     return color_ratio, color_mask
-
 
 def check_unit_type(check_region):
     if check_image(infantry_image, 0.8, detect_region=check_region): return 'infantry'
@@ -573,7 +565,7 @@ def move_drag_to_any_target(target_type = '1234567', target_zone='1', drag_is_Tr
                     return [target_type, target_zone]
                 case 9: # Deal the card
                     if x == 3: pyautogui.click(bak_mouse_pos)
-                    pyautogui.dragTo((mouse_x, pyautogui.size()[1]*65//100), duration=drag_speed_base*1.5)
+                    pyautogui.dragTo((mouse_x, pyautogui.size()[1]*65//100), duration=drag_speed_base* 0.8)
                     return [target_type, target_zone]
     return [target_type, target_zone]
 
@@ -644,7 +636,7 @@ def pixel_distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)** 2)
 
 def reset_game_stage():
-    global game_stage
+    global enter_game_seq
     global ocr_gameround
     global round_start_time
     global round_total_start_time
@@ -652,7 +644,7 @@ def reset_game_stage():
     global round_single_time
     round_finished = False
     round_single_time = 0
-    game_stage = 0
+    enter_game_seq = 0
     ocr_gameround = 0
     round_start_time = time.time()
     round_total_start_time = time.time()
@@ -717,7 +709,9 @@ def click_pass_button():
         pass_button_pos = return_img_pos
         print(formatted_time+"找到我方回合按钮，开始打牌")
 
-        reset_game_stage()
+        #reset_game_stage()
+        round_start_time = time.time()
+        round_finished = False
         time.sleep(3)# 等待过完讨厌的动画
         ocr_check_gameround()
         # 出牌处理
@@ -745,6 +739,8 @@ def click_pass_button():
         mouse_return_right()
         ocr_check_gameround()
         check_frontline_status()
+        round_start_time = time.time()
+        round_finished = False
 
 def play_round1(): #用于抽牌
     global current_card_cost
@@ -833,26 +829,38 @@ def play_round1(): #用于抽牌
             if find_ordered_keywords(joined_ocrresult, '指令', '最后', '击') != None: continue
 
             if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '单位') != None or \
-               find_ordered_keywords(joined_ocrresult, '指令', '单位', '伤害') != None:
+                find_ordered_keywords(joined_ocrresult, '指令', '单位', '伤害') != None or \
+                find_ordered_keywords(joined_ocrresult, '指令', '消灭', '敌方') != None :
                 if front_line_status == 2: move_drag_to_any_target('134567', '21')
-                else: move_drag_to_any_target('134567', '1')
+                else: move_drag_to_any_target('134567', '12')
                 continue
-
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '空军', '伤害') != None:
+                print(formatted_time + '指令', '敌方', '空军', '伤害')
                 move_drag_to_any_target('34', '12')
                 continue
-
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
+            if find_ordered_keywords(joined_ocrresult, '指令', '坦克', '伤害') != None:
+                print(formatted_time+'指令', '坦克', '伤害')
+                move_drag_to_any_target('7', '12')
+                continue
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
+            if find_ordered_keywords(joined_ocrresult, '指令', '空军', '获得') != None:
+                move_drag_to_any_target('34', '3')
+                continue
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '总部') != None or \
                     find_ordered_keywords(joined_ocrresult, '指令', '敌方', '总部') != None:
                 move_drag_to_any_target('2', '1')
                 continue
-
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '友方', '单位', '获得') != None:
                 if front_line_status == 1: move_drag_to_any_target('134567', '23')
                 else: move_drag_to_any_target('134567', '3')
                 continue
-
-            if find_ordered_keywords(joined_ocrresult, '指令', '抽', '单位') != None:
+            # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
+            if find_ordered_keywords(joined_ocrresult, '指令', '抽', '单位') != None or \
+                    find_ordered_keywords(joined_ocrresult, '指令', '所有', '敌方') != None :
                 move_drag_to_any_target('9')
                 continue
 
@@ -923,21 +931,21 @@ def play_plus():
                                 if round_stage == 0:
                                     we_have_airforce = True
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                    u_type, u_zone = move_drag_to_any_target('312576', '12')
+                                    u_type, u_zone = move_drag_to_any_target('312576', '1')
                                     print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
-                                    time.sleep(2)  # 过动画
+                                    time.sleep(3.5)  # 过动画
                             case 'bomber':
                                 if round_stage == 0:
                                     we_have_airforce = True
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                    u_type, u_zone = move_drag_to_any_target('124567', '12')
+                                    u_type, u_zone = move_drag_to_any_target('3124567', '1')
                                     print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
-                                    time.sleep(2)  # 过动画
+                                    time.sleep(3.5)  # 过动画
                             case 'mortar':
                                 if round_stage == 0:
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
                                     if we_have_airforce: u_type, u_zone = move_drag_to_any_target('312567', '12')
-                                    else: u_type, u_zone = move_drag_to_any_target('12567', '12')
+                                    else: u_type, u_zone = move_drag_to_any_target('12567', '1')
                                     print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
                                     time.sleep(2)  # 过动画
                             case 'infantry' | 'tank':
@@ -965,7 +973,7 @@ def try_restart():
 
 #-----------------------------------------------MAIN---------------------------------------------------
 def main():
-    global game_stage
+    global enter_game_seq
     global formatted_time
     global enemy_headquarters_pos
     global round_total_start_time
@@ -1013,11 +1021,9 @@ def play_ground():
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        if check_image(enemy_headquarters_image, 0.8, enemy_hq_zone) != None:
-            drag_speed = 1 * pixel_distance(int(pyautogui.position()[0]), \
-                                                          int(pyautogui.position()[1]), int(return_img_pos[0]),
-                                                          int(return_img_pos[1])) / 1000
-            print(drag_speed)
+        joined_ocrresult = '[ 指令2使用时;一次性触发效果;然后移除。ALTXANDI31为了国王对1个敌方坦克造成5点伤害。'
+        if find_ordered_keywords(joined_ocrresult, '指令', '坦克', '伤害') != None:
+            print(formatted_time + '指令', '坦克', '伤害')
 # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
