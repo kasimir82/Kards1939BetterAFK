@@ -963,7 +963,7 @@ def play_round2():
                             case 'mortar':
                                 if round_stage == 0:
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                    if we_have_airforce: u_type, u_zone = move_drag_to_any_target('312567', 'um')
+                                    if we_have_airforce: u_type, u_zone = move_drag_to_any_target('fghmit', 'um')
                                     else: u_type, u_zone = move_drag_to_any_target('ghmit', 'u')
                                     print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                     mouse_return_right()
