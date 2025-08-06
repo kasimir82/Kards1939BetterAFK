@@ -491,9 +491,9 @@ def mouse_return_left():
 def move_drag_to_any_target(target_type = '1234567', target_zone='1', drag_is_True = True):
     global return_img_pos
     drag_is_True = not drag_is_True
-    drag_speed_base = 1.2
-    for ystr in target_zone:
-        x = int(ystr)
+    drag_speed_base = 1.8
+    for zone_number in target_zone:
+        x = int(zone_number)
         if x == 1: on_region = upper_row
         elif x == 2: on_region = middle_row
         else: on_region = lower_row
@@ -521,16 +521,16 @@ def move_drag_to_any_target(target_type = '1234567', target_zone='1', drag_is_Tr
                             if x == 3: pyautogui.click(bak_mouse_pos)
                             drag_speed = drag_speed_base * pixel_distance(int(pyautogui.position()[0]),\
                                       int(pyautogui.position()[1]), int(return_img_pos[0]), int(return_img_pos[1])) / 1000
-                            if drag_is_True: pyautogui.moveTo(return_img_pos, duration=drag_speed*1.2)
-                            else: pyautogui.dragTo(return_img_pos, duration=drag_speed*1.2)
+                            if drag_is_True: pyautogui.moveTo(return_img_pos, duration=drag_speed)
+                            else: pyautogui.dragTo(return_img_pos, duration=drag_speed)
                             return [target_type, target_zone]
                 case 3:
                     if check_image(fighter_image, 0.8, on_region) != None:
                         if x == 3: pyautogui.click(bak_mouse_pos)
                         drag_speed = drag_speed_base * pixel_distance(pyautogui.position()[0],\
                                   pyautogui.position()[1], return_img_pos[0], return_img_pos[1]) / 1000
-                        if drag_is_True: pyautogui.moveTo(return_img_pos, duration=drag_speed*1.5)
-                        else: pyautogui.dragTo(return_img_pos, duration=drag_speed*1.5)
+                        if drag_is_True: pyautogui.moveTo(return_img_pos, duration=drag_speed)
+                        else: pyautogui.dragTo(return_img_pos, duration=drag_speed)
                         return [target_type, target_zone]
                 case 4:
                     if check_image(bomber_image, 0.8, on_region) != None:
@@ -718,14 +718,15 @@ def click_pass_button():
         round_finished = False
         time.sleep(3)# 等待过完讨厌的动画
         ocr_check_gameround()
-        # 出牌处理
+
 
         counter = 0
-        while round_single_time < 45 and (not round_finished) and counter < 2:
+        # 出牌处理 共运行4轮
+        while round_single_time < 40 and (not round_finished) and counter < 4:
             print(formatted_time+f'对决时间:  {round_single_time:.0f}秒')
-            play_plus()
+            play_round2()
             play_round1()
-            play_plus()
+            play_round2()
             round_single_time = time.time() - round_start_time
             counter += 1
 
@@ -930,7 +931,7 @@ def play_round1(): #用于抽牌
             #time.sleep(1)  # 卡牌发出, 等待过完动画
         #mouse_return_right()
 
-def play_plus():
+def play_round2():
     global we_have_airforce
     print(formatted_time + "移动卡牌阶段开始")  # 阶段2，引导坦克步兵向前线前进
     we_have_airforce = False
