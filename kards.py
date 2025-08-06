@@ -45,6 +45,7 @@ net_restart_image = "Resource/network_restart.png" #网络重启
 kmark_image = "Resource/kmark.png" #卡牌左上角K图标
 chat_list = "Resource/chat_kuang.png"
 training_start = "Resource/training_start.png"
+card_kmark_small_middle = "Resource/card_kmark_small_middle.png"
 
 #屏幕范围定义，注： 每张卡160x220 范围坐标为左上角x y 然后是宽度 高度
 #Screen Location Definations
@@ -78,13 +79,13 @@ front_line_upper_region = (420, 370, 1000, 37) #上面前线条表达区域
 front_line_lower_region = (420, 635, 1000, 37) #下面前线条表达区域
 card_search_region = (pyautogui.size()[0]*10//100, pyautogui.size()[1]*30//100, pyautogui.size()[0]*80//100,\
                       pyautogui.size()[1]*70//100)#卡牌详细信息的搜索区域
-
+springboard_region = (433, 930, 1064, 150)
 #Global Veriables
 ocrscanner = easyocr.Reader(['ch_sim','en']) # this needs to run only once to load the model into memory
 failsafe_counter = 0
 ocr_stamina = 0
 front_line_status = 3  #0代表未知 1代表被我占领 2代表敌方占领 3代表中立
-front_line_diff_threshold = 9
+
 game_stage = 0
 ocr_stamina = 0
 mouse_x = 0
@@ -279,7 +280,7 @@ def check_abnormal(check_orange_passbutton = True):
 
 def check_frontline_status():
     global front_line_status
-    global front_line_diff_threshold
+    front_line_diff_threshold = 7
 
     mouse_return_right() #避开遮挡
     time.sleep(0.2)
@@ -299,9 +300,11 @@ def check_frontline_status():
     gray_mean_lower = ratio
 
     front_line_status = 0
-    if gray_mean_upper > front_line_diff_threshold:  #3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+    if gray_mean_upper > gray_mean_lower and \
+            abs(gray_mean_upper-gray_mean_lower) > front_line_diff_threshold:  #3代表中立 1代表被我占领 2代表敌方占领 0代表未知
         front_line_status = 1
-    elif gray_mean_lower > front_line_diff_threshold:
+    elif gray_mean_upper < gray_mean_lower and \
+            abs(gray_mean_upper-gray_mean_lower) > front_line_diff_threshold:
         front_line_status = 2
     else:
         front_line_status = 3
@@ -373,7 +376,7 @@ def calculate_orange_ratio(image_path):
     return orange_ratio, orange_mask
 
 def calculate_black_ratio(image_path):
-    black_ratio, black_mask = calculate_color_ratio(image_path, np.array([0, 0, 10]), np.array([180, 255, 60]))
+    black_ratio, black_mask = calculate_color_ratio(image_path, np.array([0, 0, 0]), np.array([180, 255, 60]))
     #print(f'Black: {black_ratio:.2f}')
     return black_ratio, black_mask
 
@@ -681,9 +684,8 @@ def round_unit_operation(unit_position, unit_type, round_number=2):
 
 def send_message():
     want_to = random.randint(0, 100)
-    if want_to > 50 or ocr_gameround <=1 :
+    if want_to > 80 or ocr_gameround <=1 :
         time.sleep(0.5)
-    #if True:
         if check_image(msg_img, 0.9, right_onethird_screen) != None :
             if ocr_gameround <= 1: random_msg_number = 1
             else: random_msg_number = random.choice([3,5])
@@ -698,7 +700,6 @@ def send_message():
                 pyautogui.move(0, 32 * (random_msg_number-1), duration=0.6)
                 pyautogui.click()
                 time.sleep(0.5)
-
 
 def click_pass_button():
     global round_start_time
@@ -782,7 +783,7 @@ def play_round1(): #用于抽牌
             #pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.7)
             #pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
 
-
+            # ----------------------- 特殊单位处理开始 -----------------------
             print(formatted_time + "特殊指令处理部分开始")
             if '扩张若' in joined_ocrresult:
                 print(formatted_time + "发现 _扩张_ 卡牌")
@@ -795,7 +796,7 @@ def play_round1(): #用于抽牌
                 continue
             if '老兔子' in joined_ocrresult: #转移伤害给敌方总部
                 print(formatted_time + "老兔子专属处理")
-                if front_line_status == 1:
+                if front_line_status == 1:# 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
                     move_drag_to_any_target('67', '2')
                 else: move_drag_to_any_target('67', '3')
@@ -823,7 +824,8 @@ def play_round1(): #用于抽牌
                 move_drag_to_any_target('36754', '1')
                 print(formatted_time + "两栖迸攻, 直接消灭对方一个攻击小于3单位")
                 continue
-# ----------------------- 特殊处理完成
+
+            # ----------------------- 正则匹配处理开始 -----------------------
             print(formatted_time + "正则表达式匹配 处理部分开始")
             # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '最后', '击') != None: continue
@@ -831,18 +833,25 @@ def play_round1(): #用于抽牌
             if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '单位') != None or \
                 find_ordered_keywords(joined_ocrresult, '指令', '单位', '伤害') != None or \
                 find_ordered_keywords(joined_ocrresult, '指令', '消灭', '敌方') != None :
-                if front_line_status == 2: move_drag_to_any_target('134567', '21')
-                else: move_drag_to_any_target('134567', '12')
+                if front_line_status == 2: move_drag_to_any_target('134567', '21') # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+                else: move_drag_to_any_target('134567', '1')
                 continue
             # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '敌方', '空军', '伤害') != None:
                 print(formatted_time + '指令', '敌方', '空军', '伤害')
-                move_drag_to_any_target('34', '12')
+                if front_line_status == 2:  # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+                    move_drag_to_any_target('34', '12')
+                else:
+                    move_drag_to_any_target('34', '1')
                 continue
             # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '坦克', '伤害') != None:
                 print(formatted_time+'指令', '坦克', '伤害')
-                move_drag_to_any_target('7', '12')
+
+                if front_line_status == 2:  # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
+                    move_drag_to_any_target('7', '12')
+                else:
+                    move_drag_to_any_target('7', '1')
                 continue
             # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
             if find_ordered_keywords(joined_ocrresult, '指令', '空军', '获得') != None:
@@ -864,7 +873,7 @@ def play_round1(): #用于抽牌
                 move_drag_to_any_target('9')
                 continue
 
-            # ----------------------- 正则处理完成
+            # ----------------------- 战斗单位处理开始 -----------------------
             movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机']  # 某些介绍太长的单位也在列表里
             if any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                 print(formatted_time + "移动兵力")
@@ -892,7 +901,7 @@ def play_round1(): #用于抽牌
                 else:
                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 9出牌 / 1upper 2middle 3lower/ Tmove Fdrag
                     move_drag_to_any_target('9') #普通兵直接出兵
-#--------------------------- 出兵处理完成
+#--------------------------- 处理完成 ---------------------------
             print(formatted_time + "一次出牌完成")
             #mouse_return_right()
             #time.sleep(1)  # 卡牌发出, 等待过完动画
@@ -932,32 +941,32 @@ def play_plus():
                                     we_have_airforce = True
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
                                     u_type, u_zone = move_drag_to_any_target('312576', '1')
-                                    print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
+                                    print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                     time.sleep(3.5)  # 过动画
                             case 'bomber':
                                 if round_stage == 0:
                                     we_have_airforce = True
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
                                     u_type, u_zone = move_drag_to_any_target('3124567', '1')
-                                    print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
+                                    print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                     time.sleep(3.5)  # 过动画
                             case 'mortar':
                                 if round_stage == 0:
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
                                     if we_have_airforce: u_type, u_zone = move_drag_to_any_target('312567', '12')
                                     else: u_type, u_zone = move_drag_to_any_target('12567', '1')
-                                    print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
+                                    print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                     time.sleep(2)  # 过动画
                             case 'infantry' | 'tank':
                                 if round_stage == 0: # operating support line (middle)
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
                                     u_type, u_zone = move_drag_to_any_target('1345678', '2')
-                                    print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
+                                    print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                 else: # operating front line (upper)
                                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                    if we_have_airforce: u_type, u_zone = move_drag_to_any_target('31276', '1')
-                                    else: u_type, u_zone = move_drag_to_any_target('12376', '1')
-                                    print(formatted_time + f"指挥{name}, 攻击zone{u_zone}的type{u_type}")
+                                    if we_have_airforce: u_type, u_zone = move_drag_to_any_target('3126', '1')
+                                    else: u_type, u_zone = move_drag_to_any_target('1236', '1')
+                                    print(formatted_time + f"指挥{name}, 攻击zone {u_zone}的type {u_type}")
                                 time.sleep(2)  # 过动画
                         print(formatted_time + f"移动卡牌阶段结束")
                         mouse_return_right()
@@ -1017,13 +1026,19 @@ def play_ground():
     global formatted_time
     global return_img_pos
 
-    if False:      #For debugging
+    if True:      #For debugging
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        joined_ocrresult = '[ 指令2使用时;一次性触发效果;然后移除。ALTXANDI31为了国王对1个敌方坦克造成5点伤害。'
-        if find_ordered_keywords(joined_ocrresult, '指令', '坦克', '伤害') != None:
-            print(formatted_time + '指令', '坦克', '伤害')
+        posCardBox = pyautogui.locateAllOnScreen(card_kmark_small_middle, confidence=0.7, region=springboard_region)
+        posCardBoxFilterd = filter_boxes(posCardBox, 10)
+
+        for card_item in posCardBoxFilterd:
+            print('\n')
+            print(card_item)
+            is_target_pattern((int(card_item[0])-18, int(card_item[1])+17,15,15), \
+                              orange_range=((190, 120, 25), (239, 192, 95)), bg_threshold=0)
+
 # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
