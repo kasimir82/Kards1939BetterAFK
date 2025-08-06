@@ -100,7 +100,7 @@ round_finished = False
 round_single_time = 0
 we_have_airforce = False
 card_search_counter = 0
-single_round_time_limit = 45
+single_round_time_limit = 35
 
 class LogRedirector:
 
@@ -253,12 +253,13 @@ def check_abnormal(check_orange_passbutton = True):
 
     if round_finished and check_orange_passbutton: return True
     #check_frontline_status() #顺便,检查一下前线情况
-    #if check_mission_passfail():
-    #    round_finished = True
-    #    return True
+    if check_mission_passfail():
+        round_finished = True
+        return True
     round_single_time = time.time() - round_start_time
     if round_single_time > single_round_time_limit:
         print(formatted_time + "检测到本轮超时了, 直接中断")
+        round_finished = True
         return True
 
     if check_image(duishou_img, 0.8, pass_button_region) != None: #找到对手字样
@@ -373,10 +374,12 @@ def check_orange_pass_button():
 
 def check_mission_passfail():
     if check_image(mission_failed_image, 0.7, pass_fail_region) != None:
-        print(formatted_time +"检测到本局失败")
+        print(formatted_time +"检测到本局失败 等待人工处理")
+        time.sleep(15)
         return True
     if check_image(mission_passed_image, 0.7, pass_fail_region) != None:
-        print(formatted_time + "检测到本局胜利")
+        print(formatted_time + "检测到本局胜利 等待人工处理")
+        time.sleep(15)
         return True
 
 def calculate_orange_ratio(image_path):
@@ -680,6 +683,7 @@ def click_pass_button():
     global round_start_time
     global round_finished
     global round_single_time
+    global card_search_counter
 
     if check_image(pass_turn_button_image, 0.8, right_onethird_screen) != None or check_image(end_turn_button_image, 0.7, right_onethird_screen) != None:
         pass_button_pos = return_img_pos
@@ -692,11 +696,12 @@ def click_pass_button():
         ocr_check_gameround()
 
         counter = 0
+        card_search_counter = random.choice([0,1,2])
         # 出牌处理 共运行4轮
         while round_single_time < single_round_time_limit and (not round_finished) and counter < 4:
             #print(formatted_time+f'对决时间:  {round_single_time:.0f}秒')
-            play_round2()
             play_round1()
+            play_round2()
             play_round2()
             round_single_time = time.time() - round_start_time
             counter += 1
