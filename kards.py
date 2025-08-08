@@ -111,6 +111,7 @@ ours_hq_def = 20
 single_round_time_limit = 35
 return_target = []
 operating_unit = []
+unit_may_destroyed = False
 
 class LogRedirector:
 
@@ -164,10 +165,10 @@ def check_abnormal(check_orange_passbutton = True):
 
     if round_finished and check_orange_passbutton: return True
 
-    #if round_single_time > single_round_time_limit:
-    #    print(formatted_time + "检测到本轮超时了, 直接中断")
-    #    round_finished = True
-    #    return True
+    if round_single_time > single_round_time_limit and check_orange_passbutton:
+        print(formatted_time + "检测到本轮超时了, 直接中断")
+        round_finished = True
+        return True
 
     if check_orange_pass_button() and check_orange_passbutton:
         print(formatted_time + "找到了橙色的结束按钮")
@@ -268,13 +269,13 @@ def check_image(image_name, confidence_level = 0.8, detect_region=all_screen, st
             send_back[0] = int(return_img_pos[0])
             send_back[1] = int(return_img_pos[1])
             #print(formatted_time + f'找到 {image_name} -> confi level= {i:.2f}')
-            if image_name == headquarter_image: send_back[1] -= 30
+            if image_name == headquarter_image: send_back[1] -= 40
             if image_name == guard_image:
-                send_back[0] -= 60
-                send_back[1] += 30
+                send_back[0] -= 100
+                send_back[1] += 80
             if image_name in [infantry_image, tank_image, fighter_image, bomber_image, mortar_image]:
                 #print('buchang unit')
-                send_back[1] -= 70
+                send_back[1] -= 80
             return_img_pos = send_back
             return send_back
         elif i <= confidence_level:
@@ -613,8 +614,8 @@ def out_of_gameround_checking_routine():
         if failsafe_counter >= 5:
             enter_game_seq = 0
             return
-        if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
-        #if error_handling(training_start, "点击训练", 0.8, False): #进去训练模式 modmod
+        #if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
+        if error_handling(training_start, "点击训练", 0.8, False): #进去训练模式 modmod
             failsafe_counter = 0
             enter_game_seq = 3
 
@@ -731,15 +732,29 @@ def move_drag_to_any_target(target_type = 'ghfbmit89', target_zone='u', drag_is_
         for digit_char in target_type:
             match digit_char:
                 case 'g':
-                    if check_image(guard_image, 0.8, on_region) != None:
-                        drag_speed = drag_speed_base * pixel_distance(pyautogui.position()[0], \
-                                                                      pyautogui.position()[1], return_img_pos[0],
-                                                                      return_img_pos[1]) / 1000
-                        if zone_number == 'l': pyautogui.click(bak_mouse_pos,duration=0.5)
-                        mouse_shake()
-                        pyautogui.moveTo(return_img_pos, duration=drag_speed)
-                        pyautogui.mouseUp()
-                        return [target_type, target_zone]
+                    if zone_number == 'u':
+                        if check_image(headquarter_image, 0.8, enemy_hq_zone) != None:
+                            hq_pos = return_img_pos
+                            if check_image(guard_image, 0.8, (hq_pos[0]-192,hq_pos[1]-103,537,91)) != None:
+                                drag_speed = drag_speed_base * pixel_distance(pyautogui.position()[0], \
+                                                                              pyautogui.position()[1], return_img_pos[0],
+                                                                              return_img_pos[1]) / 1000
+                                if zone_number == 'l': pyautogui.click(bak_mouse_pos,duration=0.5)
+                                mouse_shake()
+                                pyautogui.moveTo(return_img_pos, duration=drag_speed)
+                                pyautogui.mouseUp()
+                                return [target_type, target_zone]
+                    elif zone_number == 'm':
+                        if check_image(guard_image, 0.8, on_region) != None:
+                            drag_speed = drag_speed_base * pixel_distance(pyautogui.position()[0], \
+                                                                          pyautogui.position()[1], return_img_pos[0],
+                                                                          return_img_pos[1]) / 1000
+                            if zone_number == 'l': pyautogui.click(bak_mouse_pos, duration=0.5)
+                            mouse_shake()
+                            pyautogui.moveTo(return_img_pos, duration=drag_speed)
+                            pyautogui.mouseUp()
+                            return [target_type, target_zone]
+
                 case 'h':
                     if zone_number == 'u' or zone_number == 'l':
                         if check_image(headquarter_image, 0.8, enemy_hq_zone) != None or \
@@ -1080,7 +1095,7 @@ def play_round2():
 
                             if round_stage == 0: # operating support line (middle)
                                 # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                u_type, u_zone = move_drag_to_any_target('fbmit8', 'm')
+                                u_type, u_zone = move_drag_to_any_target('fgbmit8', 'm')
 
                             else: # operating front line (upper)
                                 # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
@@ -1191,24 +1206,26 @@ def scan_battle_field(scan_region=upper_row):
     return return_target
 
 
-def get_better_target(unit_list=return_target, target_id='infantry', max_def:int= 9 ):
-    # 步骤1：按id筛选
+def get_better_target(unit_list=return_target, target_id='infantry', max_def = 9 ):
+    global unit_may_destroyed
+
+    unit_may_destroyed = False
     filtered_by_id = [unit for unit in unit_list if unit['id'] == target_id]
     if not filtered_by_id:
-        return None  # 或返回空列表[]，根据需求调整
-    # 步骤2：按atk筛选（小于等于max_def）
+        return None
+    # 步骤2：按def筛选（小于等于max_def）
     filtered_by_def = [unit for unit in filtered_by_id if unit['def'] <= max_def]
     if filtered_by_def:
         # 步骤3：按atk逆向排序（从高到低）
         sorted_by_atk_desc = sorted(filtered_by_def, key=lambda x: x['atk'], reverse=True)
         # 步骤4：返回atk最高的第一个元素的location
         return sorted_by_atk_desc[0]['location']
-    else:
+    else:#按def排序, 返回最低的一个
         sorted_by_def_desc = sorted(filtered_by_id, key=lambda x: x['def'])
         if sorted_by_def_desc:
             return sorted_by_def_desc[0]['location']
         else:
-            return None  # 或返回空列表[]，根据需求调整
+            return None
 
 def play_ground():
     global formatted_time
@@ -1218,7 +1235,7 @@ def play_ground():
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        play_round2()
+        move_drag_to_any_target(target_type='gh',target_zone='u')
 # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
