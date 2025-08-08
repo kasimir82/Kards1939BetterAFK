@@ -1,6 +1,9 @@
 import pyautogui, time, datetime, pygetwindow as gw, random, sys, easyocr, keyboard, math
-from datetime import datetime
 import re, cv2, numpy as np, os
+from datetime import datetime
+from PIL import Image
+from dataclasses import dataclass
+from typing import List
 
 pyautogui.FAILSAFE = False
 # 安装命令：
@@ -18,7 +21,7 @@ exp_image = "Resource/exptext.png" #刷经验模组图标
 continue_button_image = "Resource/continue.png"#‘继续’二字按钮
 exit_button_image = "Resource/exit.png"#退出按钮
 clicked_exit_button_image = "Resource/clickedExit.png"
-enemy_headquarters_image = "Resource/enemy_headquarters.png"#敌方总部
+headquarter_image = "Resource/enemy_headquarters.png"#敌方总部
 bomber_image = "Resource/bomber.png"#轰炸机
 fighter_image = "Resource/fighter.png"#战斗机
 infantry_image = "Resource/infantry.png"#步兵
@@ -50,6 +53,7 @@ card_kmark_small_middle = "Resource/card_kmark_small_middle.png"
 card_kmark_small_tiltright = "Resource/card_kmark_small_tiltright.png"
 frontline_downmark = "Resource/frontline_down.png"
 frontline_upmark = "Resource/frontline_up.png"
+card_bot_loc = "Resource/card_bottom.png"
 
 #屏幕范围定义，注： 每张卡160x220 范围坐标为左上角x y 然后是宽度 高度
 #Screen Location Definations
@@ -102,7 +106,11 @@ round_finished = False
 round_single_time = 0
 we_have_airforce = False
 card_search_counter = 0
+enemy_hq_def = 20
+ours_hq_def = 20
 single_round_time_limit = 35
+return_target = []
+
 
 class LogRedirector:
 
@@ -237,7 +245,7 @@ def check_frontline_status():
 
     return
 
-def check_image(image_name, confidence_level, detect_region=all_screen, step_opt=0.05, grayscale_opt=False, failcount = 3):  # 图像查找包装程序
+def check_image(image_name, confidence_level = 0.8, detect_region=all_screen, step_opt=0.05, grayscale_opt=False, failcount = 3):  # 图像查找包装程序
     global return_img_pos
     i = 1.0
     failsafe_counter = 0
@@ -261,8 +269,8 @@ def check_image(image_name, confidence_level, detect_region=all_screen, step_opt
             send_back = [0, 0]
             send_back[0] = int(return_img_pos[0])
             send_back[1] = int(return_img_pos[1])
-            print(formatted_time + f'找到 {image_name} -> confi level= {i:.2f}')
-            if image_name == enemy_headquarters_image: send_back[1] -= 30
+            #print(formatted_time + f'找到 {image_name} -> confi level= {i:.2f}')
+            if image_name == headquarter_image: send_back[1] -= 30
             if image_name == guard_image:
                 send_back[0] -= 60
                 send_back[1] += 30
@@ -328,12 +336,21 @@ def calculate_color_ratio(image_path, lower_threshold, upper_threshold):
     color_ratio = (color_pixels / total_pixels) * 100
     return color_ratio, color_mask
 
+def detect_unit_type(detect_region):
+    #pyautogui.screenshot('test.png', region=detect_region)
+    if check_image(infantry_image, detect_region=detect_region) != None: return 'i'
+    elif check_image(tank_image, detect_region=detect_region) != None: return 't'
+    elif check_image(bomber_image, detect_region=detect_region) != None: return 'b'
+    elif check_image(fighter_image, detect_region=detect_region) != None: return 'f'
+    elif check_image(mortar_image, detect_region=detect_region) != None: return 'm'
+    else:
+        return None
 
 def error_handling(input_img = start_scale125_img, output_string = "Error Handling", confi_level = 0.9, reset_stage = False, search_pos = all_screen):
     global return_img_pos
     if check_image(input_img, confi_level, search_pos) != None :
         #pyautogui.moveTo(pyautogui.size()[0] // 2+ random.uniform(-200, 200), pyautogui.size()[1] // 2+ random.uniform(-200, 200), duration=random.uniform(0.2, 0.5))
-        pyautogui.moveTo( (return_img_pos[0] + random.uniform(-10, 10),return_img_pos[1] + random.uniform(-10, 10)), duration=random.uniform(0.2, 0.5))
+        pyautogui.moveTo( (return_img_pos[0] + random.uniform(-10, 10),return_img_pos[1] + random.uniform(-10, 10)), duration=random.uniform(0.5, 0.8))
         #time.sleep(0.2)
         pyautogui.click(return_img_pos)
         #pyautogui.click(return_img_pos)
@@ -344,7 +361,6 @@ def error_handling(input_img = start_scale125_img, output_string = "Error Handli
     else:
         return False
 
-
 def filter_boxes(raw_data, threshold):
     filtered_boxes = []
     for box in raw_data:
@@ -352,7 +368,6 @@ def filter_boxes(raw_data, threshold):
                filtered_boxes):
             filtered_boxes.append(box)
     return filtered_boxes
-
 
 def find_ordered_keywords(text, kw1="", kw2="", kw3="", kw4="", kw5=""):
     keywords = [kw for kw in [kw1, kw2, kw3, kw4, kw5] if kw]
@@ -386,7 +401,6 @@ def handle_old_log(log_filename="run_log.txt"):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         old_log_filename = f"log_{timestamp}.txt"
         os.rename(log_filename, old_log_filename)
-
 
 def is_target_pattern(region,  # 待检测区域 (x, y, width, height)
                       # 调整墨绿色范围（基于69,68,58，允许±10的波动）
@@ -488,6 +502,17 @@ def ocr_check_card_cost():
         current_card_cost = 99  # 未找到卡消耗,给一个假的
         kmark_location = (0,0)
         return current_card_cost
+
+def ocr_get_number(region=all_screen, mag=2):
+    ocrimage = pyautogui.screenshot(region=region)
+    ocrimage.save('test.png')
+    img_array = np.array(ocrimage)
+    ocrresult = ocrscanner.readtext(img_array, ['ru', 'en'], mag_ratio=mag, detail=0, allowlist='0123456789')
+    if ocrresult:
+        joined_ocrresult = int(''.join(ocrresult))
+    else: joined_ocrresult = 0
+    return joined_ocrresult
+
 def pixel_distance(x1, y1, x2, y2):
     """计算两个像素点(x1,y1)和(x2,y2)之间的直线距离"""
     return math.sqrt((x2 - x1)**2 + (y2 - y1)** 2)
@@ -563,7 +588,7 @@ def out_of_gameround_checking_routine():
                 main_menu_button_image, 0.9, left_onethird_screen) != None:
             #pyautogui.moveTo(pyautogui.size()[0] // 2 + random.uniform(-200, 200),
             #                 pyautogui.size()[1] // 2 + random.uniform(-200, 200), duration=0.7)
-            pyautogui.moveTo(return_img_pos, duration=random.uniform(0.2, 0.5))
+            pyautogui.moveTo(return_img_pos, duration=random.uniform(0.5, 0.8))
             time.sleep(0.2)
             pyautogui.click(return_img_pos)
             pyautogui.click(return_img_pos)
@@ -579,7 +604,7 @@ def out_of_gameround_checking_routine():
             enter_game_seq = 0
             return
         if check_image(exp_image, 0.7, all_screen, grayscale_opt=True) != None:
-            pyautogui.moveTo(return_img_pos, duration=random.uniform(0.2, 0.5))
+            pyautogui.moveTo(return_img_pos, duration=random.uniform(0.5, 0.8))
             pyautogui.click(return_img_pos)
             failsafe_counter = 0
             enter_game_seq = 2
@@ -589,8 +614,8 @@ def out_of_gameround_checking_routine():
         if failsafe_counter >= 5:
             enter_game_seq = 0
             return
-        if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
-        #if error_handling(training_start, "点击休闲模式", 0.8, False): #进去训练模式 modmod
+        #if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
+        if error_handling(training_start, "点击休闲模式", 0.8, False): #进去训练模式 modmod
             failsafe_counter = 0
             enter_game_seq = 3
 
@@ -714,8 +739,9 @@ def move_drag_to_any_target(target_type = 'ghfbmit89', target_zone='u', drag_is_
                         pyautogui.mouseUp()
                         return [target_type, target_zone]
                 case 'h':
-                    if zone_number == 'u':
-                        if check_image(enemy_headquarters_image, 0.8, enemy_hq_zone) != None:
+                    if zone_number == 'u' or zone_number == 'l':
+                        if check_image(headquarter_image, 0.8, enemy_hq_zone) != None or \
+                            check_image(headquarter_image, 0.8, lower_row) != None:
                             if zone_number == 'l': pyautogui.click(bak_mouse_pos)
                             drag_speed = drag_speed_base * pixel_distance(int(pyautogui.position()[0]),\
                                       int(pyautogui.position()[1]), int(return_img_pos[0]), int(return_img_pos[1])) / 1000
@@ -1085,19 +1111,74 @@ def main():
             begin_new_game_routine()
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
 
+def scan_battle_field(scan_region=upper_row):
+    global enemy_hq_def
+    global ours_hq_def
+    global return_target
+
+    return_target.clear()
+
+    try:
+        UnitBox = pyautogui.locateAllOnScreen(card_bot_loc, confidence=0.9, region=scan_region)
+        UnitBoxFiltered = filter_boxes(UnitBox, 10)
+        counter = 0
+
+        for unit in UnitBoxFiltered:
+            unit_type = detect_unit_type(detect_region=[int(unit[0]) - 45, int(unit[1]) - 45, 60, 60])
+            ocrimage_atk = ocr_get_number(region=(int(unit[0]) - 72, int(unit[1]) - 22, 23, 30))
+            ocrimage_def = ocr_get_number(region=(int(unit[0]) + 24, int(unit[1]) - 22, 23, 30))
+            #print(f'{unit}\ntype: {unit_type},atk: {ocrimage_atk}, def: {ocrimage_def}')
+            counter += 1
+            return_target.append({
+                "id": unit_type,
+                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
+                "atk": int(ocrimage_atk),
+                "def": int(ocrimage_def),
+                "special": ""
+            })
+    except Exception:
+        counter = 0
+
+    if scan_region == upper_row or scan_region == lower_row:
+        if check_image(headquarter_image, detect_region=scan_region) != None:
+            ocr_number = ocr_get_number(region=(int(return_img_pos[0]-33), int(return_img_pos[1]+22), 70, 68), mag=1.5)
+            ocrimage_def = int(ocr_number)
+            if 70 <= ocrimage_def < 80:  ocrimage_def -= 60 # scan '1' as '7'
+            #print(f'HQ found, def: {ocrimage_def}')
+            if scan_region == upper_row: enemy_hq_def = ocrimage_def
+            else: ours_hq_def = ocrimage_def
+            counter += 1
+            return_target.append({
+                "id": "h",
+                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
+                "atk": 0,
+                "def": int(ocrimage_def),
+                "special": ""
+            })
+    #print(f'total: {counter}')
+    print('result')
+    for unit in return_target:
+        print(unit)
+    #print('sorted')
+    #sorted_by_atk = sorted(return_target, key=lambda x: x["atk"])
+    #for unit in sorted_by_atk:
+    #    print(unit)
+    return return_target
+
 def play_ground():
     global formatted_time
     global return_img_pos
 
-    if False:      #For debugging
+    if True:      #For debugging
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        check_image(training_start, confidence_level=0.8)
-
+        scan_battle_field(scan_region=all_screen)
 # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
+
+
 
 if __name__ == "__main__":
     main()
