@@ -5,7 +5,7 @@ from PIL import Image
 from dataclasses import dataclass
 from typing import List
 
-ryan_mode = False
+ryan_mode = 1
 
 # 安装命令：
 # pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2 keyboard
@@ -138,19 +138,6 @@ class Box:
     def __repr__(self):
         return f"Box(left={self.left}, top={self.top}, width={self.width}, height={self.height})"
 
-
-
-def count_unit_number(unit_image, unit_region = lower_row):
-    counter = 0
-    try:
-        posUnitBox = pyautogui.locateAllOnScreen(unit_image, confidence=0.8, region=unit_region)
-        posUnitBoxFilterd = filter_boxes(posUnitBox, 10)
-        for posUnit in posUnitBoxFilterd: counter += 1
-    except Exception as e:
-        counter += 0
-    return counter
-
-
 def check_abnormal(check_orange_passbutton = True):
     global ocr_stamina
     global round_finished
@@ -203,19 +190,18 @@ def check_frontline_status():
     front_line_diff_threshold = 7
 
     mouse_return_home() #避开遮挡
-    time.sleep(0.2)
 
-    front_up = check_image(frontline_upmark, confidence_level=0.5, detect_region=front_line_lower_region, \
+    front_up = check_image(frontline_upmark, confidence_level=0.6, detect_region=front_line_upper_region, \
                            grayscale_opt=True)
-    front_down = check_image(frontline_downmark, confidence_level=0.5, detect_region=front_line_lower_region, \
+    front_down = check_image(frontline_downmark, confidence_level=0.6, detect_region=front_line_lower_region, \
                            grayscale_opt=True)
 
     front_line_status = 3
     if front_up != None and front_down == None:
         front_line_status = 1
-        print(formatted_time + f"图像检测得出前线 我方占领")
+        print(formatted_time + f"图像检测 得出前线 我方占领")
     elif front_up == None and front_down != None:
-        print(formatted_time + f"图像检测得出前线 敌方")
+        print(formatted_time + f"图像检测 得出前线 敌方")
         front_line_status = 2
     else:
         ocrimage = pyautogui.screenshot(region=front_line_upper_region)
@@ -312,15 +298,6 @@ def check_mission_passfail():
         time.sleep(15)
         return True
 
-def check_unit_type(check_region):
-    if check_image(infantry_image, 0.8, detect_region=check_region): return 'infantry'
-    if check_image(tank_image, 0.8, detect_region=check_region): return 'tank'
-    if check_image(fighter_image, 0.8, detect_region=check_region): return 'fighter'
-    if check_image(bomber_image, 0.8, detect_region=check_region): return 'bomber'
-    if check_image(mortar_image, 0.8, detect_region=check_region): return 'mortar'
-    return None
-
-
 def calculate_orange_ratio(image_path):
     orange_ratio, orange_mask = calculate_color_ratio(image_path, np.array([16, 100, 100]), \
                                                       np.array([25, 255, 255]))
@@ -361,7 +338,7 @@ def error_handling(input_img = start_scale125_img, output_string = "Error Handli
                           duration=random.uniform(0.5, 0.8))
         #time.sleep(0.2)
         pyautogui.click(return_img_pos)
-        #pyautogui.click(return_img_pos)
+        pyautogui.click(return_img_pos)
         print(formatted_time+output_string)
         if reset_stage:
             reset_game_stage()
@@ -403,6 +380,27 @@ def gameround_timeout_bug_reset():  # 有时候20s倒计时失效，此时单手
         reset_game_stage()
     return
 
+def get_better_target(unit_list=return_target, target_id='infantry', max_def = 9 ):
+    global unit_may_destroyed
+
+    unit_may_destroyed = False
+    filtered_by_id = [unit for unit in unit_list if unit['id'] == target_id]
+    if not filtered_by_id:
+        return None
+    # 步骤2：按def筛选（小于等于max_def）
+    filtered_by_def = [unit for unit in filtered_by_id if unit['def'] <= max_def]
+    if filtered_by_def:
+        # 步骤3：按atk逆向排序（从高到低）
+        sorted_by_atk_desc = sorted(filtered_by_def, key=lambda x: x['atk'], reverse=True)
+        # 步骤4：返回atk最高的第一个元素的location
+        return sorted_by_atk_desc[0]['location']
+    else:#按def排序, 返回最低的一个
+        sorted_by_def_desc = sorted(filtered_by_id, key=lambda x: x['def'])
+        if sorted_by_def_desc:
+            return sorted_by_def_desc[0]['location']
+        else:
+            return None
+
 def handle_old_log(log_filename="run_log.txt"):
     """处理已存在的旧日志文件"""
     if os.path.exists(log_filename):
@@ -420,7 +418,6 @@ def is_target_pattern(region,  # 待检测区域 (x, y, width, height)
                       ):
     """
     检测指定屏幕区域是否符合：深墨绿色底色 + 橙色数字
-    返回：符合条件则返回True，否则False
     """
     screenshot = pyautogui.screenshot(region=region)
     img = screenshot.convert('RGB')
@@ -451,11 +448,6 @@ def mouse_shake():
     pyautogui.mouseDown()
     pyautogui.move(5, 0)
     pyautogui.move(5, -10)
-
-def mouse_compensate():
-    if pyautogui.position()[0] < pyautogui.size()[0] // 2:
-        pyautogui.move(44, 0)
-    else: pyautogui.move(-44, 0)
 
 def ocr_check_stamina(): #Check Stamina by using OCR
     global ocr_stamina
@@ -561,7 +553,6 @@ def setup_logging(log_filename="run_log.txt"):
     sys.stdout = LogRedirector(log_filename)
     start_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-
 def send_message():
     want_to = random.randint(0, 100)
     if want_to > 80 or ocr_gameround <=1 :
@@ -581,7 +572,66 @@ def send_message():
                 pyautogui.click()
                 time.sleep(0.5)
 
-def try_restart():
+def scan_battle_field(scan_region=upper_row):
+    global enemy_hq_def
+    global ours_hq_def
+    global return_target
+
+    return_target.clear()
+
+    try:
+        UnitBox = pyautogui.locateAllOnScreen(card_bot_loc, confidence=0.9, region=scan_region)
+        UnitBoxFiltered = filter_boxes(UnitBox, 10)
+        counter = 0
+
+        for unit in UnitBoxFiltered:
+            unit_type = detect_unit_type(detect_region=[int(unit[0]) - 45, int(unit[1]) - 45, 60, 60])
+            ocrimage_atk = ocr_get_number(region=(int(unit[0]) - 72, int(unit[1]) - 22, 23, 30))
+            ocrimage_def = ocr_get_number(region=(int(unit[0]) + 24, int(unit[1]) - 22, 23, 30))
+
+            if scan_region != upper_row and is_target_pattern(region=(int(unit[0]) - 90, int(unit[1]) - 197, \
+                                         25, 29)):
+                unit_avail = True
+                print(f'x {unit[0]} - y {unit[1]}, type: {unit_type},atk: {ocrimage_atk},def: {ocrimage_def},avail: {unit_avail}')
+            else: unit_avail = False
+            counter += 1
+            return_target.append({
+                "id": unit_type,
+                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
+                "atk": int(ocrimage_atk),
+                "def": int(ocrimage_def),
+                "special": "",
+                "avail": unit_avail
+            })
+    except Exception:
+        #print(formatted_time + "ScanBattle未找到任何符合图片")
+        counter = 0
+        return None
+
+    """
+    if scan_region == upper_row or scan_region == lower_row:
+        if check_image(headquarter_image, detect_region=scan_region) != None:
+            ocr_number = ocr_get_number(region=(int(return_img_pos[0]-33), int(return_img_pos[1]+22), 70, 68), mag=1.5)
+            ocrimage_def = int(ocr_number)
+            if 70 <= ocrimage_def < 80:  ocrimage_def -= 60 # scan '1' as '7'
+            #print(f'HQ found, def: {ocrimage_def}')
+            if scan_region == upper_row: enemy_hq_def = ocrimage_def
+            else: ours_hq_def = ocrimage_def
+            counter += 1
+            return_target.append({
+                "id": "hq",
+                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
+                "atk": 0,
+                "def": int(ocrimage_def),
+                "special": "",
+                "avail": False
+            })
+            """
+
+    return return_target
+
+
+def try_restart_from_launcher():
     error_handling(start_scale125_img, "找到重新开始DPI 125%，点击") #启动器按钮写的太shit
     error_handling(start_scale100_img, "找到重新开始DPI 100%，点击")
 
@@ -718,7 +768,7 @@ def begin_new_game_routine():
         counter = 0
         card_search_counter = 0
         # 出牌处理 共运行最多6轮
-        while round_single_time < single_round_time_limit and (not round_finished) and counter < 6:
+        while not round_finished and counter < 8:
             #print(formatted_time+f'对决时间:  {round_single_time:.0f}秒')
             play_round2()
             play_round1()
@@ -872,9 +922,11 @@ def play_round1(): #用于抽牌
     global card_search_counter
     global operating_unit
 
-    operating_unit = {'atk': 3} #用于攻击防御力小于3的目标
     mouse_yaxis_coeff = 40
 
+    if check_abnormal():
+        print(formatted_time + "第1轮出牌检查到异常, 退出")
+        return
     print(formatted_time +"第1轮出牌，抽最下面的牌") #阶段1，抽牌
     #time.sleep(1)  # 等待过完抽卡动画
     check_frontline_status()  # 顺便,检查一下前线情况
@@ -893,7 +945,7 @@ def play_round1(): #用于抽牌
             card_search_counter = 0
         case _:
             card_search_counter = 0
-    #for i in range(7):
+
     posCardBoxFilterd = None
     #if True:
     try:
@@ -905,19 +957,15 @@ def play_round1(): #用于抽牌
             if is_target_pattern((int(card_item[0])-18, int(card_item[1])+17,15,15), \
                               orange_range=((190, 120, 25), (239, 192, 95)), bg_threshold=0):
                 if check_abnormal():
-                    print(formatted_time + "第4轮出牌检查到异常, 退出")
+                    print(formatted_time + "第1轮出牌检查到异常, 退出")
                     return
                 x = int(card_item[0])+17
-                #x = 600 + i * random.randint(89, 99)
+
                 mouse_x = x
 
-                #pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.4)
                 pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                 time.sleep(0.2)  # 等待过完动画
                 ocr_check_card_cost()
-                #ocr_check_stamina()
-                #if current_card_cost <= ocr_stamina:
-                #if current_card_cost != 99:
                 if True:
                     #print(formatted_time + f"当前手牌消耗 {current_card_cost} 小于等于体力 {ocr_stamina} ")
                     #------------- OCR ---------------
@@ -932,10 +980,11 @@ def play_round1(): #用于抽牌
                     # ------------- OCR ---------------
 
                     # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
-                    #pyautogui.moveTo(x, y=pyautogui.size()[1] - mouse_yaxis_coeff, duration=0.7)
-                    #pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
 
-                    # ----------------------- 特殊单位处理开始 -----------------------
+
+            # ----------------------- 特殊单位处理开始 -----------------------
+                    operating_unit = {'atk': 99}  # 用于攻击对方攻击力最高的目标
+
                     print(formatted_time + "特殊指令处理部分开始")
                     if '老兔子' in joined_ocrresult:
                         print(formatted_time + "老兔子专属处理")
@@ -955,7 +1004,8 @@ def play_round1(): #用于抽牌
                     if find_ordered_keywords(joined_ocrresult, '指令', '扩张', '前线') != None:
                         if front_line_status == 1:# 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
                             move_drag_to_any_target('9')
-                        # ----------------------- 正则匹配处理开始 -----------------------
+
+            # ----------------------- 正则匹配处理开始 -----------------------
                     print(formatted_time + "正则表达式匹配 处理部分开始")
                     # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank / 1upper 2middle 3lower/ Tmove Fdrag
                     if find_ordered_keywords(joined_ocrresult, '指令', '最后', '击') != None: continue
@@ -1027,7 +1077,7 @@ def play_round1(): #用于抽牌
                         else: move_drag_to_any_target('i', 'l')
                         continue
 
-                    # ----------------------- 战斗单位处理开始 -----------------------
+            # ----------------------- 战斗单位处理开始 -----------------------
                     movable_unit = ['坦克', '步兵', '炮兵', '战斗机', '轰炸机']  # 某些介绍太长的单位也在列表里
                     if any(word for word in movable_unit if word in joined_ocrresult):   #移动兵力
                         print(formatted_time + "移动兵力")
@@ -1070,6 +1120,9 @@ def play_round2():
     global operating_unit
 
     print(formatted_time + "移动卡牌阶段开始")  # 阶段2，引导坦克步兵向前线前进
+    if check_abnormal():
+        print(formatted_time + "移动卡牌阶段检查到异常, 退出")
+        return
     we_have_airforce = False
     # 0代表未知 1代表被我占领 2代表敌方占领 3代表中立
     #if front_line_status == 1:
@@ -1086,11 +1139,6 @@ def play_round2():
         if round_stage == 1 and front_line_status != 1:
             print(formatted_time + "前线不是我们的. 跳过前线 移动卡牌阶段")
             continue
-
-        if check_abnormal():
-            print(formatted_time + "移动卡牌阶段发现异常")
-            return
-
         if round_stage == 0:
             scan_battle_field(scan_region=lower_row)
         elif round_stage == 1:
@@ -1100,6 +1148,9 @@ def play_round2():
         if avail_true_items:
             try:
                 for posUnit in avail_true_items:
+                    if check_abnormal():
+                        print(formatted_time + "移动卡牌阶段发现异常")
+                        return
 
                     if round_stage == 0:
                         scan_battle_field(scan_region=lower_row)
@@ -1107,7 +1158,6 @@ def play_round2():
                         scan_battle_field(scan_region=middle_row)
                     backup_target = return_target.copy()
                     avail_true_items = [item for item in backup_target if item.get("avail", False)]
-
 
                     operating_unit = posUnit
                     name = str(posUnit['id'])
@@ -1137,7 +1187,9 @@ def play_round2():
                         case 'infantry' | 'tank':
                             if round_stage == 0: # operating support line (middle)
                                 # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
-                                u_type, u_zone = move_drag_to_any_target('fgbmit8', 'm')
+                                # 0代表未知 1代表被我占领 2代表敌方占领 3代表中立
+                                if front_line_status == 1: u_type, u_zone = move_drag_to_any_target('8', 'm')
+                                else: u_type, u_zone = move_drag_to_any_target('fgbmit8', 'm')
 
                             else: # operating front line (upper)
                                 # 1guard 2hq 3fighter 4bomb 5motar 6infan 7tank 8rush/ 1upper 2middle 3lower/ Tmove Fdrag
@@ -1183,7 +1235,7 @@ def main():
                     game_active = True
         except Exception as e:
             game_active = False
-            try_restart()
+            try_restart_from_launcher()
             reset_game_stage()
             print(formatted_time + "未找到游戏窗口")
         if game_active:
@@ -1191,96 +1243,25 @@ def main():
             begin_new_game_routine()
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
 
-def scan_battle_field(scan_region=upper_row):
-    global enemy_hq_def
-    global ours_hq_def
-    global return_target
-
-    return_target.clear()
-
-    try:
-        UnitBox = pyautogui.locateAllOnScreen(card_bot_loc, confidence=0.9, region=scan_region)
-        UnitBoxFiltered = filter_boxes(UnitBox, 10)
-        counter = 0
-
-        for unit in UnitBoxFiltered:
-            unit_type = detect_unit_type(detect_region=[int(unit[0]) - 45, int(unit[1]) - 45, 60, 60])
-            ocrimage_atk = ocr_get_number(region=(int(unit[0]) - 72, int(unit[1]) - 22, 23, 30))
-            ocrimage_def = ocr_get_number(region=(int(unit[0]) + 24, int(unit[1]) - 22, 23, 30))
-
-            if scan_region != upper_row and is_target_pattern(region=(int(unit[0]) - 90, int(unit[1]) - 197, \
-                                         25, 29)): unit_avail = True
-            else: unit_avail = False
-
-            print(f'x {unit[0]} - y {unit[1]}, type: {unit_type},atk: {ocrimage_atk},def: {ocrimage_def},avail: {unit_avail}')
-            counter += 1
-            return_target.append({
-                "id": unit_type,
-                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
-                "atk": int(ocrimage_atk),
-                "def": int(ocrimage_def),
-                "special": "",
-                "avail": unit_avail
-            })
-    except Exception:
-        print(formatted_time + "ScanBattle未找到任何符合图片")
-        counter = 0
-        return None
-
-    """
-    if scan_region == upper_row or scan_region == lower_row:
-        if check_image(headquarter_image, detect_region=scan_region) != None:
-            ocr_number = ocr_get_number(region=(int(return_img_pos[0]-33), int(return_img_pos[1]+22), 70, 68), mag=1.5)
-            ocrimage_def = int(ocr_number)
-            if 70 <= ocrimage_def < 80:  ocrimage_def -= 60 # scan '1' as '7'
-            #print(f'HQ found, def: {ocrimage_def}')
-            if scan_region == upper_row: enemy_hq_def = ocrimage_def
-            else: ours_hq_def = ocrimage_def
-            counter += 1
-            return_target.append({
-                "id": "hq",
-                "location": [int(unit[0]) - 15,int(unit[1]) - 96],
-                "atk": 0,
-                "def": int(ocrimage_def),
-                "special": "",
-                "avail": False
-            })
-            """
-
-    return return_target
 
 
-def get_better_target(unit_list=return_target, target_id='infantry', max_def = 9 ):
-    global unit_may_destroyed
 
-    unit_may_destroyed = False
-    filtered_by_id = [unit for unit in unit_list if unit['id'] == target_id]
-    if not filtered_by_id:
-        return None
-    # 步骤2：按def筛选（小于等于max_def）
-    filtered_by_def = [unit for unit in filtered_by_id if unit['def'] <= max_def]
-    if filtered_by_def:
-        # 步骤3：按atk逆向排序（从高到低）
-        sorted_by_atk_desc = sorted(filtered_by_def, key=lambda x: x['atk'], reverse=True)
-        # 步骤4：返回atk最高的第一个元素的location
-        return sorted_by_atk_desc[0]['location']
-    else:#按def排序, 返回最低的一个
-        sorted_by_def_desc = sorted(filtered_by_id, key=lambda x: x['def'])
-        if sorted_by_def_desc:
-            return sorted_by_def_desc[0]['location']
-        else:
-            return None
 
 def play_ground():
     global formatted_time
     global return_img_pos
 
-    if False:      #For debugging
+    if 0:      #For debugging
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        move_drag_to_any_target(target_type='gh',target_zone='u')
-# ---------------- Debug Section End ----------------------
+        front_up = check_image(frontline_upmark, confidence_level=0.6, detect_region=front_line_upper_region, \
+                               grayscale_opt=True)
+        front_down = check_image(frontline_downmark, confidence_level=0.6, detect_region=front_line_lower_region, \
+                                 grayscale_opt=True)
+        print(front_up)
+        print(front_down)
+        # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
 
