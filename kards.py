@@ -5,7 +5,7 @@ from PIL import Image
 from dataclasses import dataclass
 from typing import List
 
-ryan_mode = 1
+ryan_mode = 0
 
 # 安装命令：
 # pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2 keyboard
@@ -55,6 +55,8 @@ card_kmark_small_tiltright = "Resource/card_kmark_small_tiltright.png"
 frontline_downmark = "Resource/frontline_down.png"
 frontline_upmark = "Resource/frontline_up.png"
 card_bot_loc = "Resource/card_bottom.png"
+everyday_task = "Resource/everyday_task.png"
+level_up_img = "Resource/level_up.png"
 
 #屏幕范围定义，注： 每张卡160x220 范围坐标为左上角x y 然后是宽度 高度
 #Screen Location Definations
@@ -108,7 +110,7 @@ we_have_airforce = False
 card_search_counter = 0
 enemy_hq_def = 20
 ours_hq_def = 20
-single_round_time_limit = 45
+single_round_time_limit = 53
 return_target = []
 operating_unit = []
 unit_may_destroyed = False
@@ -144,10 +146,6 @@ def check_abnormal(check_orange_passbutton = True):
     global round_single_time
 
     #check_frontline_status() #顺便,检查一下前线情况
-    if check_mission_passfail():
-        round_finished = True
-        return True
-
     round_single_time = time.time() - round_start_time
 
     if round_finished and check_orange_passbutton: return True
@@ -168,6 +166,8 @@ def check_abnormal(check_orange_passbutton = True):
         return True
     if check_image(continue_button_image, 0.8, lower_half_screen) != None: #找到继续字样
         print(formatted_time + "异常检测程序发现 [继续] 字样")
+        check_mission_passfail()
+        check_current_level()
         round_finished = True
         return True
 
@@ -184,6 +184,11 @@ def check_abnormal(check_orange_passbutton = True):
         round_finished = True
         sys.exit(0)
     return False
+
+def check_current_level():
+    if check_image(level_up_img):
+        current_level = ocr_get_number((return_img_pos[0]-115,return_img_pos[1]-350,176,107), mag=0.7)
+        print(formatted_time + f"检测到当前等级为{current_level:.0f}级")
 
 def check_frontline_status():
     global front_line_status
@@ -229,8 +234,8 @@ def check_frontline_status():
             front_line_status = 2
         else:
             front_line_status = 3
-        print(formatted_time+f"上方前线黑色度: {gray_mean_upper: .2f} ,下方前线黑色度: {gray_mean_lower: .2f} ,\
-            前线状态: " + frontline_status[front_line_status])
+        print(formatted_time+f"上方前线黑色度:{gray_mean_upper:.2f} ,下方前线黑色度:{gray_mean_lower:.2f} ,"+\
+            "前线状态: " + frontline_status[front_line_status])
 
     return
 
@@ -330,15 +335,18 @@ def detect_unit_type(detect_region):
         return None
 
 def error_handling(input_img = start_scale125_img, output_string = "Error Handling", confi_level = 0.9, \
-                   reset_stage = False, search_pos = all_screen):
+                   reset_stage = False, search_pos = all_screen, click_any = False):
     global return_img_pos
     if check_image(input_img, confi_level, search_pos) != None :
         #pyautogui.moveTo(pyautogui.size()[0] // 2+ random.uniform(-200, 200), pyautogui.size()[1] // 2+ random.uniform(-200, 200), duration=random.uniform(0.2, 0.5))
+        if click_any: return_img_pos = [20, 20]
         pyautogui.moveTo( (return_img_pos[0] + random.uniform(-10, 10),return_img_pos[1] + random.uniform(-10, 10)), \
-                          duration=random.uniform(0.5, 0.8))
+                          duration=random.uniform(0.6, 0.9))
         #time.sleep(0.2)
         pyautogui.click(return_img_pos)
         pyautogui.click(return_img_pos)
+
+
         print(formatted_time+output_string)
         if reset_stage:
             reset_game_stage()
@@ -718,15 +726,25 @@ def out_of_gameround_checking_routine():
         if game_window != None: game_window.minimize()
         sys.exit(0)
 
-    check_mission_passfail()
+    #if error_handling(continue_button_image, "点击了继续按钮, 结束战斗（一般是输了）", 0.7, reset_stage=True):
 
-    error_handling(continue_button_image, "点击了继续按钮, 结束战斗（一般是输了）", 0.7, reset_stage=True)
+    if check_image(continue_button_image, 0.7, all_screen, grayscale_opt=True) != None:
+        save_pos = return_img_pos
+        print(formatted_time + "发现了继续按钮, 结束战斗")
+        check_mission_passfail()
+        check_current_level()
+        pyautogui.moveTo(save_pos, duration=random.uniform(0.5, 0.8))
+        pyautogui.click(save_pos)
+        pyautogui.click(save_pos)
+        reset_game_stage()
 
     error_handling(get_gold, "找到今日金币字样，点击")
 
     error_handling(restart_img, "找到重新连接字样，点击")
 
     error_handling(disconnect_img, "找到退出(2)字样，点击")
+
+    error_handling(everyday_task, "找到每日任务，点击", click_any = True)
 
     #    error_handling(training_start, "找到教学关开始按钮，点击")
 
@@ -796,7 +814,7 @@ def begin_new_game_routine():
 def move_drag_to_any_target(target_type = 'ghfbmit89', target_zone='u', drag_is_True = True):
     global return_img_pos
 
-    drag_speed_base = 2
+    drag_speed_base = 1.4
     for zone_number in target_zone:
         if zone_number == 'u':
             on_region = upper_row
@@ -904,13 +922,13 @@ def move_drag_to_any_target(target_type = 'ghfbmit89', target_zone='u', drag_is_
                     #print('.S.L.G.F.')
                     mouse_shake()
                     pyautogui.moveTo((pyautogui.size()[0] // 2 + random.choice([-1, 1]) * random.uniform(44, 50), \
-                                      pyautogui.size()[1]*41//100), duration=drag_speed_base*0.7)
+                                      pyautogui.size()[1]*41//100), duration=drag_speed_base*0.5)
                     pyautogui.mouseUp()
                     return [target_type, target_zone]
                 case '9': # Deal the card
                     if zone_number == 'l': pyautogui.click(bak_mouse_pos)
                     mouse_shake()
-                    pyautogui.moveTo((mouse_x, pyautogui.size()[1]*65//100), duration=drag_speed_base*0.3)
+                    pyautogui.moveTo((mouse_x, pyautogui.size()[1]*65//100), duration=drag_speed_base*0.5)
                     pyautogui.mouseUp()
                     return [target_type, target_zone]
     return [target_type, target_zone]
@@ -965,10 +983,13 @@ def play_round1(): #用于抽牌
 
                 pyautogui.click(x, y=pyautogui.size()[1] - mouse_yaxis_coeff)
                 time.sleep(0.2)  # 等待过完动画
-                ocr_check_card_cost()
+                #ocr_check_card_cost()
                 if True:
                     #print(formatted_time + f"当前手牌消耗 {current_card_cost} 小于等于体力 {ocr_stamina} ")
                     #------------- OCR ---------------
+                    if check_image(kmark_image, confidence_level=0.83, step_opt=0.05, failcount=6, \
+                                detect_region=card_search_region) != None:
+                        kmark_location = (int(return_img_pos[0]), int(return_img_pos[1]))
                     if kmark_location[0] != 0:
                         ocrimage = pyautogui.screenshot(region=(kmark_location[0] - 390, kmark_location[1] - 30, 700, 500))
                         img_array = np.array(ocrimage)
@@ -979,13 +1000,11 @@ def play_round1(): #用于抽牌
                     print(joined_ocrresult)
                     # ------------- OCR ---------------
 
-                    # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
-
-
             # ----------------------- 特殊单位处理开始 -----------------------
                     operating_unit = {'atk': 99}  # 用于攻击对方攻击力最高的目标
 
                     print(formatted_time + "特殊指令处理部分开始")
+                    # 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
                     if '老兔子' in joined_ocrresult:
                         print(formatted_time + "老兔子专属处理")
                         if front_line_status == 1:# 3代表中立 1代表被我占领 2代表敌方占领 0代表未知
@@ -1151,14 +1170,6 @@ def play_round2():
                     if check_abnormal():
                         print(formatted_time + "移动卡牌阶段发现异常")
                         return
-
-                    if round_stage == 0:
-                        scan_battle_field(scan_region=lower_row)
-                    elif round_stage == 1:
-                        scan_battle_field(scan_region=middle_row)
-                    backup_target = return_target.copy()
-                    avail_true_items = [item for item in backup_target if item.get("avail", False)]
-
                     operating_unit = posUnit
                     name = str(posUnit['id'])
                     pyautogui.click(posUnit['location'])
@@ -1216,7 +1227,7 @@ def main():
     game_active = False
     round_total_start_time = time.time()
     reset_game_stage()
-    print(" -- KARDs 1939 Better AFK, Ver 250805a by Eason -- ")
+    print(" -- KARDs 1939 Better AFK, Ver 250812a by Eason -- ")
     play_ground()
     setup_logging()
     while True:
@@ -1255,13 +1266,8 @@ def play_ground():
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        front_up = check_image(frontline_upmark, confidence_level=0.6, detect_region=front_line_upper_region, \
-                               grayscale_opt=True)
-        front_down = check_image(frontline_downmark, confidence_level=0.6, detect_region=front_line_lower_region, \
-                                 grayscale_opt=True)
-        print(front_up)
-        print(front_down)
-        # ---------------- Debug Section End ----------------------
+        check_abnormal()
+# ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
 
