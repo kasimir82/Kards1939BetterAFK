@@ -5,7 +5,8 @@ from PIL import Image
 from dataclasses import dataclass
 from typing import List
 
-ryan_mode = 1
+training_mode = 1
+junxu_mode = 1
 
 # 安装命令：
 # pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2 keyboard
@@ -57,6 +58,8 @@ frontline_upmark = "Resource/frontline_up.png"
 card_bot_loc = "Resource/card_bottom.png"
 everyday_task = "Resource/everyday_task.png"
 level_up_img = "Resource/level_up.png"
+junxu_img = "Resource/junxu.png"
+junxu_box_final = "Resource/junxu_box_final.png"
 
 #屏幕范围定义，注： 每张卡160x220 范围坐标为左上角x y 然后是宽度 高度
 #Screen Location Definations
@@ -310,6 +313,25 @@ def check_mission_passfail():
         time.sleep(15)
         return True
 
+def check_junxu_progress():
+    if check_image(junxu_img, detect_region=lower_half_screen) != None:
+        junxu_location = (int(return_img_pos[0]) , int(return_img_pos[1]))
+        x1 = int(return_img_pos[0] - 44)
+        y1 = int(return_img_pos[1] + 40)
+        crop_region = (x1, y1, 134, 23)
+        ocrimage = pyautogui.screenshot(region=crop_region)
+        ocrimage.save('test.png')
+        img_array = np.array(ocrimage)
+        try:
+            b_number = calculate_pureblack_ratio(img_array)
+        except Exception as e:
+            return 999
+            pass
+        print(formatted_time + f"检测到军需箱进度, 纯黑色像素个数{b_number:.0f}")
+        return b_number
+    else:
+        return 999
+
 def calculate_orange_ratio(image_path):
     orange_ratio, orange_mask = calculate_color_ratio(image_path, np.array([16, 100, 100]), \
                                                       np.array([25, 255, 255]))
@@ -321,6 +343,25 @@ def calculate_black_ratio(image_path):
                                                     np.array([180, 255, 50]))
     #print(f'Black: {black_ratio:.2f}')
     return black_ratio, black_mask
+
+def calculate_pureblack_ratio(image_path):
+    image = image_path
+    tolerance = 2
+    # 将BGR转换为RGB（OpenCV默认读取为BGR格式）
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # 检测接近黑色的像素 (R、G、B都在0到tolerance之间)
+    near_black_mask = np.all(
+        (image_rgb >= 0) & (image_rgb <= tolerance),
+        axis=-1
+    )
+    # 计算并返回纯黑色像素的个数
+    if near_black_mask is None:
+        black_pixel_count = 0
+    else:
+        black_pixel_count = int(np.sum(near_black_mask))
+
+    return black_pixel_count
 
 def calculate_color_ratio(image_path, lower_threshold, upper_threshold):
     image = image_path
@@ -678,6 +719,7 @@ def out_of_gameround_checking_routine():
     global failsafe_counter
     global game_window
     global round_single_time
+    global return_img_pos
 
     round_single_time = time.time() - round_start_time
     round_total_time = time.time() - round_total_start_time
@@ -701,6 +743,17 @@ def out_of_gameround_checking_routine():
                 main_menu_button_image, 0.9, left_onethird_screen) != None:
             #pyautogui.moveTo(pyautogui.size()[0] // 2 + random.uniform(-200, 200),
             #                 pyautogui.size()[1] // 2 + random.uniform(-200, 200), duration=0.7)
+            return_img_pos_bak = return_img_pos
+            if junxu_mode == 1 and check_junxu_progress() < 5:
+                if check_image(junxu_box_final) != None:
+                    print(formatted_time + "检测到军需箱已经满了并且只打军需箱, 退出程序")
+                    kill_process_by_keyword("kards")
+                    kill_process_by_keyword("launcher")
+                    time.sleep(2)
+                    sys.exit(0)
+                else:
+                    print(formatted_time + "检测到军需箱已经满了, 但是级别不够, 继续打")
+            return_img_pos = return_img_pos_bak
             pyautogui.moveTo(return_img_pos, duration=random.uniform(0.5, 0.8))
             time.sleep(0.2)
             pyautogui.click(return_img_pos)
@@ -727,7 +780,7 @@ def out_of_gameround_checking_routine():
         if failsafe_counter >= 5:
             enter_game_seq = 0
             return
-        if ryan_mode:
+        if training_mode:
             if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
                 failsafe_counter = 0
                 enter_game_seq = 3
@@ -754,7 +807,7 @@ def out_of_gameround_checking_routine():
     if check_image(reconnect_img, 0.9) != None:  # Check if 被别的设备踢出去了
         kill_process_by_keyword("kards")
         kill_process_by_keyword("launcher")
-        print(formatted_time + "[然然]触发了重新登陆，杀进程3")
+        print(formatted_time + "[然然]触发了重新登陆，杀进程2")
         time.sleep(2)
         sys.exit(0)
 
@@ -1296,7 +1349,7 @@ def main():
     game_active = False
     round_total_start_time = time.time()
     reset_game_stage()
-    print(" -- KARDs 1939 Better AFK, Ver 250827a by Eason -- ")
+    print(" -- KARDs 1939 Better AFK, Ver 250912 by Eason -- ")
     play_ground()
     setup_logging()
     while True:
@@ -1323,8 +1376,6 @@ def main():
             begin_new_game_routine()
 #-------------------------------------------MAIN, Bro Out-----------------------------------------------
 
-
-
 def play_ground():
     global formatted_time
     global return_img_pos
@@ -1333,7 +1384,7 @@ def play_ground():
         now = datetime.now()
         formatted_time = now.strftime("DEBUG Session " + '%m-%d %H:%M:%S -- ')
 # ---------------- Debug Section Start --------------------
-        kill_process_by_keyword("kards")
+        check_junxu_progress()
 # ---------------- Debug Section End ----------------------
         print("\nDebug Session Ends")
         while True: sys.exit(0)
