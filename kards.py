@@ -9,7 +9,7 @@ training_mode = 1
 junxu_mode = 1
 
 # 安装命令：
-# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr cv2 keyboard
+# pip install pyScreeze numpy opencv_python PyAutoGUI PyGetWindow Pillow easyocr keyboard psutil
 
 #图片定义 Image Definations
 confirm_button_image = "Resource/confirm.png" #选派确认按钮
@@ -746,7 +746,7 @@ def out_of_gameround_checking_routine():
             return_img_pos_bak = return_img_pos
             if junxu_mode == 1 and check_junxu_progress() < 5:
                 if check_image(junxu_box_final) != None:
-                    print(formatted_time + "检测到军需箱已经满了并且只打军需箱, 退出程序")
+                    print(formatted_time + "检测到军需箱已经满了并且有最高级图标, 退出程序")
                     kill_process_by_keyword("kards")
                     kill_process_by_keyword("launcher")
                     time.sleep(2)
@@ -781,7 +781,7 @@ def out_of_gameround_checking_routine():
             enter_game_seq = 0
             return
         if training_mode:
-            if error_handling(xiuxian_image, "点击休闲模式", 0.8, False, right_onethird_screen): #进入休闲
+            if error_handling(xiuxian_image, "点击休闲模式", 0.6, False, right_onethird_screen, gray_scale_opt=True): #进入休闲
                 failsafe_counter = 0
                 enter_game_seq = 3
         else:
